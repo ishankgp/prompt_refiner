@@ -10,6 +10,101 @@ from datetime import datetime
 
 load_dotenv()
 
+def validate_environment():
+    """Validate required environment variables are present"""
+    required_vars = ['OPENAI_API_KEY']
+    missing = [var for var in required_vars if not os.getenv(var)]
+    if missing:
+        raise ValueError(f"Missing required environment variables: {missing}")
+    
+    # Log successful validation (without exposing secrets)
+    logging.info("Environment validation successful")
+
+# Validate environment on startup
+try:
+    validate_environment()
+except ValueError as e:
+    logging.error(f"Environment validation failed: {e}")
+    raise
+
+class Config:
+    """Application configuration class"""
+    SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+    OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+    MAX_ITERATIONS = int(os.environ.get('MAX_ITERATIONS', '5'))
+    OUTPUT_DIR = os.environ.get('OUTPUT_DIR', 'outputs')
+    LOG_DIR = os.environ.get('LOG_DIR', 'logs')
+    DEFAULT_MODEL = os.environ.get('DEFAULT_MODEL', 'gpt-4o')
+    DEFAULT_TEMPERATURE = float(os.environ.get('DEFAULT_TEMPERATURE', '1.0'))
+    DEFAULT_MAX_TOKENS = int(os.environ.get('DEFAULT_MAX_TOKENS', '16000'))
+    
+    @classmethod
+    def validate(cls):
+        """Validate configuration values"""
+        if not cls.OPENAI_API_KEY:
+            raise ValueError("OPENAI_API_KEY is required")
+        if not 0 <= cls.DEFAULT_TEMPERATURE <= 2:
+            raise ValueError("DEFAULT_TEMPERATURE must be between 0 and 2")
+        if cls.DEFAULT_MAX_TOKENS <= 0:
+            raise ValueError("DEFAULT_MAX_TOKENS must be positive")
+
+# Validate configuration
+Config.validate()
+
+def validate_refinement_params(data):
+    """Validate refinement parameters"""
+    required_fields = ['prompt']
+    for field in required_fields:
+        if not data.get(field):
+            raise ValueError(f"Missing required field: {field}")
+        if not isinstance(data[field], str) or len(data[field].strip()) == 0:
+            raise ValueError(f"Field '{field}' must be a non-empty string")
+    
+    # Validate optional numeric parameters
+    if 'temperature' in data:
+        try:
+            temp = float(data['temperature'])
+            if not 0 <= temp <= 2:
+                raise ValueError("Temperature must be between 0 and 2")
+        except (ValueError, TypeError):
+            raise ValueError("Temperature must be a valid number")
+    
+    if 'max_tokens' in data:
+        try:
+            tokens = int(data['max_tokens'])
+            if tokens <= 0 or tokens > 100000:
+                raise ValueError("max_tokens must be between 1 and 100000")
+        except (ValueError, TypeError):
+            raise ValueError("max_tokens must be a valid positive integer")
+    
+    if 'max_iterations' in data:
+        try:
+            iterations = int(data['max_iterations'])
+            if iterations <= 0 or iterations > 20:
+                raise ValueError("max_iterations must be between 1 and 20")
+        except (ValueError, TypeError):
+            raise ValueError("max_iterations must be a valid positive integer")
+
+def sanitize_input(text):
+    """Sanitize user input to prevent potential security issues"""
+    if not isinstance(text, str):
+        return str(text)
+    
+    # Remove potentially dangerous characters while preserving content
+    # This is a basic sanitization - adjust based on your needs
+    import re
+    
+    # Remove null bytes and control characters except newlines and tabs
+    text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', text)
+    
+    # Limit length to prevent memory issues
+    max_length = 1000000  # 1MB of text
+    if len(text) > max_length:
+        text = text[:max_length]
+        logging.warning(f"Input truncated to {max_length} characters")
+    
+    return text.strip()
+
 def load_default_attachment():
     """Load the default attachment from webpage.txt"""
     try:
@@ -149,10 +244,12 @@ REASONING: [2-3 sentences explaining key factors]
     try:
         # Use temperature 1.0 for GPT-5 (only supported value), 0.3 for others
         scoring_temperature = 1.0 if model.startswith('gpt-5') else 0.3
-        api_params = get_model_params(model, scoring_temperature, 1500)
-        response = client.chat.completions.create(
+        
+        response = make_openai_request(
             messages=[{"role": "user", "content": scoring_prompt}],
-            **api_params
+            model=model,
+            temperature=scoring_temperature,
+            max_tokens=1500
         )
         
         evaluation_text = response.choices[0].message.content
@@ -305,9 +402,75 @@ def save_session_results(session_data):
     last_session_results['timestamp'] = datetime.now().isoformat()
     logger.info(f"Session results saved for session: {session_data.get('session_id')}")
 
+def load_most_recent_session():
+    """Load the most recent session from saved files"""
+    try:
+        outputs_dir = "outputs"
+        if not os.path.exists(outputs_dir):
+            return None
+            
+        # Get all refined_prompt_*.json files
+        files = [f for f in os.listdir(outputs_dir) if f.startswith("refined_prompt_") and f.endswith(".json")]
+        if not files:
+            return None
+            
+        # Sort by filename (timestamp) to get the most recent
+        files.sort(reverse=True)
+        most_recent = files[0]
+        
+        filepath = os.path.join(outputs_dir, most_recent)
+        with open(filepath, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            
+        # Transform the file data to match the expected session format
+        session_data = {
+            'session_id': data.get('metadata', {}).get('session_id'),
+            'refined_prompt': data.get('final_refined_prompt'),
+            'final_prompt': data.get('final_refined_prompt'),
+            'history': data.get('refinement_history', []),
+            'satisfied': data.get('metadata', {}).get('satisfied', False),
+            'final_scores': data.get('metadata', {}).get('final_scores', {}),
+            'metadata': data.get('metadata', {}),
+            'timestamp': data.get('timestamp'),
+            'model': data.get('metadata', {}).get('model'),
+            'temperature': data.get('metadata', {}).get('temperature'),
+            'max_tokens': data.get('metadata', {}).get('max_tokens'),
+            'iterations_completed': data.get('metadata', {}).get('iterations'),
+            'total_tokens': data.get('metadata', {}).get('total_tokens'),
+            'original_prompt': data.get('original_prompt')
+        }
+        
+        logger.info(f"Loaded most recent session from: {most_recent}")
+        return session_data
+        
+    except Exception as e:
+        logger.error(f"Error loading most recent session: {e}")
+        return None
+
 def get_last_session_results():
     """Get the last session results"""
-    return last_session_results
+    # This function will now always try to load the most recent session from a file,
+    # ensuring that the latest data is available even after a server restart.
+    # The in-memory `last_session_results` will be updated by this.
+    
+    file_data = load_most_recent_session()
+    if file_data:
+        # Update the global in-memory session data as well
+        global last_session_results
+        last_session_results.update(file_data)
+        return file_data
+    
+    # Return empty results if nothing found in files or memory
+    return {
+        'error': 'No session data found',
+        'session_id': None,
+        'refined_prompt': None,
+        'history': [],
+        'satisfied': False,
+        'final_scores': {},
+        'metadata': {},
+        'timestamp': None
+    }
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'prompt_refiner_secret_key'
@@ -316,6 +479,50 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 client = OpenAI(
     api_key=os.environ.get("OPENAI_API_KEY"),
 )
+
+def make_openai_request(messages, model, temperature, max_tokens, timeout=60):
+    """
+    Make an OpenAI API request with proper error handling
+    """
+    import openai
+    
+    try:
+        params = get_model_params(model, temperature, max_tokens)
+        
+        response = client.chat.completions.create(
+            messages=messages,
+            timeout=timeout,
+            **params
+        )
+        return response
+        
+    except openai.RateLimitError as e:
+        logger.error(f"OpenAI rate limit exceeded: {e}")
+        raise ValueError("API rate limit exceeded. Please try again later.")
+        
+    except openai.AuthenticationError as e:
+        logger.error(f"OpenAI authentication error: {e}")
+        raise ValueError("Invalid API key. Please check your OPENAI_API_KEY.")
+        
+    except openai.APIConnectionError as e:
+        logger.error(f"OpenAI connection error: {e}")
+        raise ValueError("Unable to connect to OpenAI API. Please check your internet connection.")
+        
+    except openai.APITimeoutError as e:
+        logger.error(f"OpenAI timeout error: {e}")
+        raise ValueError("Request timed out. Please try again.")
+        
+    except openai.BadRequestError as e:
+        logger.error(f"OpenAI bad request error: {e}")
+        raise ValueError(f"Invalid request: {e}")
+        
+    except openai.APIStatusError as e:
+        logger.error(f"OpenAI API status error: {e}")
+        raise ValueError(f"API error (status {e.status_code}): {e}")
+        
+    except Exception as e:
+        logger.error(f"Unexpected error in OpenAI request: {e}")
+        raise ValueError(f"Unexpected error: {e}")
 
 def save_refined_prompt(original_prompt, refined_prompt, history, metadata, logs=None):
     """Save the refined prompt to a file with timestamp"""
@@ -356,10 +563,19 @@ def index():
                          default_evaluation_criteria=default_evaluation_criteria,
                          has_default_criteria=bool(default_evaluation_criteria))
 
+@app.route('/api/health')
+def health_check():
+    """Simple health check endpoint"""
+    logger.info("Health check successful")
+    return jsonify({"status": "ok"})
+
 @app.route('/api/last-session')
 def get_last_session():
     """API endpoint to get last session results"""
-    return jsonify(get_last_session_results())
+    logger.info("API call to /api/last-session received.")
+    results = get_last_session_results()
+    logger.info(f"Returning session data from /api/last-session: {results}")
+    return jsonify(results)
 
 @socketio.on('connect')
 def handle_connect():
@@ -408,28 +624,48 @@ def handle_refinement(data):
     
     log_and_emit("Starting refinement process via WebSocket", '🚀')
     
+    # Validate environment
     if not os.environ.get("OPENAI_API_KEY"):
         log_and_emit('Missing OPENAI_API_KEY. Set it in your .env file.', '❌', 'error')
         return
-        
-    initial_prompt = data.get('prompt')
-    attachments = data.get('attachments') or ""
-    model = data.get('model', 'gpt-5')
     
+    # Validate and sanitize input parameters
+    try:
+        validate_refinement_params(data)
+        
+        # Sanitize inputs
+        prompt = sanitize_input(data.get('prompt', ''))
+        criteria = sanitize_input(data.get('criteria', ''))
+        attachments = data.get('attachments', '')
+        if attachments:
+            attachments = sanitize_input(attachments)
+            
+        log_and_emit("Input validation successful", '✅')
+        
+    except ValueError as e:
+        log_and_emit(f'Input validation failed: {e}', '❌', 'error')
+        return
+    except Exception as e:
+        log_and_emit(f'Unexpected validation error: {e}', '❌', 'error')
+        return
+        
+    # Extract parameters with defaults from config
+    try:
+        initial_prompt = prompt  # Use sanitized version
+        model = data.get('model', Config.DEFAULT_MODEL)
+        temperature = float(data.get('temperature', Config.DEFAULT_TEMPERATURE))
+        max_tokens = int(data.get('max_tokens', Config.DEFAULT_MAX_TOKENS))
+        max_iterations = int(data.get('max_iterations', Config.MAX_ITERATIONS))
+        iterate_until_satisfied = data.get('iterate_until_satisfied', False)
+        evaluation_criteria_override = criteria if criteria else ''
+    except (TypeError, ValueError) as e:
+        log_and_emit(f"Invalid parameter types in request: {e}", '❌', 'error')
+        return
+        
     log_and_emit(f"Session ID: {session_id}", '🆔')
     log_and_emit(f"Starting refinement with {model}", '🚀')
     log_and_emit(f"Initial prompt: {initial_prompt[:100]}{'...' if len(initial_prompt) > 100 else ''}", '📝')
     
-    try:
-        temperature = float(data.get('temperature', 1.0))
-        max_tokens = int(data.get('max_tokens', 6000))
-        max_iterations = int(data.get('max_iterations', 5))
-        iterate_until_satisfied = data.get('iterate_until_satisfied', False)
-    except (TypeError, ValueError):
-        temperature, max_tokens, max_iterations = 1.0, 6000, 5
-        iterate_until_satisfied = False
-        log_and_emit(f"Invalid parameters provided, using defaults", '⚠️')
-        
     # Clamp ranges
     temperature = max(0.0, min(2.0, temperature))
     if not iterate_until_satisfied:
@@ -442,8 +678,6 @@ def handle_refinement(data):
         log_and_emit(f"Parameters: temp={temperature}, tokens={max_tokens}, iterating until satisfied (max {max_iterations})", '⚙️')
     else:
         log_and_emit(f"Parameters: temp={temperature}, tokens={max_tokens}, max_iter={max_iterations}", '⚙️')
-    
-    evaluation_criteria_override = (data.get('evaluation_criteria') or '').strip()
     
     if not initial_prompt:
         log_and_emit('Prompt is required', '❌', 'error')
@@ -483,13 +717,15 @@ def handle_refinement(data):
 
             try:
                 log_and_emit("Calling OpenAI API for evaluation criteria...", '💬')
-                api_params = get_model_params(model, temperature, max_tokens)
-                response = client.chat.completions.create(
+                
+                response = make_openai_request(
                     messages=[
                         {"role": "system", "content": "You are a precise assistant that crafts prompt evaluation checklists."},
                         {"role": "user", "content": criteria_generation}
                     ],
-                    **api_params
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens
                 )
                 evaluation_criteria = response.choices[0].message.content.strip()
                 log_and_emit(f"Evaluation criteria generated: {evaluation_criteria[:100]}...", '✅')
@@ -528,13 +764,15 @@ def handle_refinement(data):
 
         try:
             log_and_emit("Calling OpenAI API for analysis...", '💬')
-            api_params = get_model_params(model, temperature, max_tokens)
-            response = client.chat.completions.create(
+            
+            response = make_openai_request(
                 messages=[
                     {"role": "system", "content": "You are a pharma and audio narration expert providing detailed critiques."},
                     {"role": "user", "content": critique_prompt}
                 ],
-                **api_params
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens
             )
             critique = response.choices[0].message.content.strip()
             log_and_emit(f"Analysis complete: {critique[:100]}...", '✅')
@@ -612,13 +850,15 @@ def handle_refinement(data):
 
         try:
             log_and_emit("Calling OpenAI API for prompt refinement...", '💬')
-            api_params = get_model_params(model, temperature, max_tokens)
-            response = client.chat.completions.create(
+            
+            response = make_openai_request(
                 messages=[
                     {"role": "system", "content": "You are an expert at refining prompt instructions. You improve the INSTRUCTIONS themselves, you do not execute the instructions to create content. Always return improved instructions/prompts, never the content those instructions would generate."},
                     {"role": "user", "content": refinement_prompt}
                 ],
-                **api_params
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens
             )
             current_prompt = response.choices[0].message.content.strip()
             log_and_emit(f"Iteration {iteration_num} refinement complete", '✨')
@@ -671,6 +911,8 @@ def handle_refinement(data):
     # Send final result with scores
     result = {
         'refined_prompt': current_prompt,
+        'final_prompt': current_prompt,  # Add for frontend compatibility
+        'original_prompt': initial_prompt,  # Add original prompt
         'history': history,
         'iterations': iterations_done,
         'satisfied': satisfied,
@@ -680,6 +922,7 @@ def handle_refinement(data):
         'saved_file': filename,
         'session_id': session_id,
         'final_scores': final_scores,
+        'scores': final_scores,  # Add for frontend compatibility
         'final_readiness': final_scores.get('overall_readiness', 0),
         'final_confidence': final_scores.get('confidence', 0)
     }
@@ -697,4 +940,28 @@ def handle_refinement(data):
             handler.close()
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, port=5001, host='127.0.0.1')
+    try:
+        logger.info("Starting Flask-SocketIO server...")
+        logger.info(f"Host: 0.0.0.0, Port: 5000, Debug: False")
+        logger.info("Server configuration: Production mode with enhanced error handling")
+        
+        # Use Flask-SocketIO's run method instead of app.run for WebSocket support
+        socketio.run(
+            app,
+            host='0.0.0.0',
+            port=5000,
+            debug=False,
+            use_reloader=False,
+            allow_unsafe_werkzeug=True,
+            log_output=True
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to start server: {e}")
+        raise
+
+if __name__ == '__main__':
+    logger.info("Starting Flask-SocketIO server...")
+    logger.info(f"Host: 0.0.0.0, Port: 5000, Debug: False")
+    logger.info("Server configuration: Production mode with enhanced error handling")
+    socketio.run(app, debug=False, port=5000, host='0.0.0.0')

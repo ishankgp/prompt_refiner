@@ -55,68 +55,136 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        /* New styles for the header and container */
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2em;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1.5em;
+        }
+
+        .header h1 {
+            font-size: 1.8em;
+            margin: 0;
+            color: #333;
+        }
+
+        /* Session loader notification styles */
+        #session-loader {
+            display: none;
+            margin-top: 2em;
+            padding: 1em;
+            border-radius: 8px;
+            background-color: #e3f2fd;
+            border: 1px solid #1976d2;
+        }
+
+        #session-loader h3 {
+            color: #1565c0;
+            margin-bottom: 1em;
+        }
+
+        #session-loader p {
+            margin: 0.5em 0;
+        }
+
+        /* General button styles */
+        button {
+            padding: 0.6em 1.2em;
+            background-color: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background-color: #155a8a;
+        }
+
+        /* Legacy styles - to be removed once confirmed */
+        #sessionResults {
+            display: none;
+        }
     </style>
 </head>
 <body>
-    <h1>Prompt Refiner</h1>
-    <form id="refine-form">
-        <label for="prompt">Initial Prompt:</label><br>
-        <textarea id="prompt" name="prompt" required></textarea><br>
-        <label for="attachments">Attachments (webpage.txt loaded as default):</label><br>
-        <small style="color: #666; margin-bottom: 0.5em; display: block;">📎 Default attachment from webpage.txt is automatically loaded. You can modify or replace this content.</small>
-        <textarea id="attachments" name="attachments">{{ default_attachment }}</textarea><br>
-
-        <h3>Parameters</h3>
-        <label for="model">Model:</label>
-        <select id="model" name="model">
-            <option value="gpt-5" selected>🚀 gpt-5 (Most capable)</option>
-            <option value="gpt-4o">🎯 gpt-4o (Recommended)</option>
-            <option value="gpt-4o-mini">💰 gpt-4o-mini (Cost‑effective)</option>
-            <option value="gpt-3.5-turbo">⚡ gpt-3.5-turbo (Fast & affordable)</option>
-        </select>
-        <small style="color: #666; display: block; margin-top: 0.2em; margin-bottom: 1em;">
-            💡 <strong>Model Guide:</strong> Use <strong>gpt-5</strong> for the highest quality results. For other needs, <strong>gpt-4o</strong> offers a great balance of capability and cost.
-        </small>
-        <small style="color: #666; display: block; margin-top: 0.2em; margin-bottom: 1em;">
-            🔗 Sources: <a href="https://openai.com" target="_blank" rel="noopener">@OpenAI</a> ·
-            <a href="https://platform.openai.com/docs/overview" target="_blank" rel="noopener">@openai_docs</a>
-        </small>
-        <br>
-        <label for="temperature">Temperature:</label>
-        <input type="range" id="temperature" name="temperature" min="0" max="2" step="0.1" value="1">
-        <span id="temperature-value">1.0</span>
-        <br>
-        <label for="max_tokens">Max Tokens:</label>
-        <input type="number" id="max_tokens" name="max_tokens" value="6000">
-        <br>
-        <label for="max_iterations">Max Iterations:</label>
-        <input type="number" id="max_iterations" name="max_iterations" value="5" min="1" max="10">
-        <br>
-        <label for="iterate_until_satisfied">
-            <input type="checkbox" id="iterate_until_satisfied" name="iterate_until_satisfied">
-            Iterate until satisfaction is achieved (ignore max iterations)
-        </label>
-        <small style="color: #666; display: block; margin-left: 1.2em; margin-top: 0.2em;">⚠️ This may result in many iterations and higher costs</small>
-        <br>
-
-        <label for="evaluation_criteria">Evaluation Criteria (prompt_refinement.md loaded as default):</label>
-        {% if has_default_criteria %}
-        <small style="color: #28a745; margin-bottom: 0.5em; display: block;">📋 Default pharma/audio expert evaluation criteria from prompt_refinement.md is automatically loaded. You can modify or replace this content.</small>
-        {% else %}
-        <small style="color: #dc3545; margin-bottom: 0.5em; display: block;">⚠️ prompt_refinement.md not found - please provide your evaluation criteria or leave blank for automatic generation.</small>
-        {% endif %}
-        <textarea id="evaluation_criteria" name="evaluation_criteria">{{ default_evaluation_criteria }}</textarea><br>
-
-        <button type="submit">Refine Prompt</button>
-    </form>
-
-    <!-- Last Session Results -->
-    <div id="last-session" style="margin-top: 2em; display: none;">
-        <h3 style="color: #1565c0;">📊 Last Session Results</h3>
-        <div style="background: #f8f9fa; padding: 1em; border-radius: 4px; border: 1px solid #e9ecef;">
-            <div id="last-session-content"></div>
+    <div class="container">
+        <div class="header">
+            <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" alt="GitHub Logo" style="height: 40px; width: 40px; margin-right: 15px;">
+            <h1>Interactive Prompt Refiner</h1>
         </div>
-        <button onclick="loadLastSession()" style="margin-top: 0.5em; background: #1976d2; color: white; border: none; padding: 0.5em 1em; border-radius: 4px; cursor: pointer;">🔄 Load Last Session</button>
+        <p>This tool helps you refine and evaluate prompts using LLMs. Provide an initial prompt, define your objective, and the tool will iteratively improve it.</p>
+        
+        <form id="refinement-form">
+            <label for="prompt">Initial Prompt:</label><br>
+            <textarea id="prompt" name="prompt" required></textarea><br>
+            <label for="attachments">Attachments (webpage.txt loaded as default):</label><br>
+            <small style="color: #666; margin-bottom: 0.5em; display: block;">📎 Default attachment from webpage.txt is automatically loaded. You can modify or replace this content.</small>
+            <textarea id="attachments" name="attachments">{{ default_attachment }}</textarea><br>
+
+            <h3>Parameters</h3>
+            <label for="model">Model:</label>
+            <select id="model" name="model">
+                <option value="gpt-5" selected>🚀 gpt-5 (Most capable)</option>
+                <option value="gpt-4o">🎯 gpt-4o (Recommended)</option>
+                <option value="gpt-4o-mini">💰 gpt-4o-mini (Cost‑effective)</option>
+                <option value="gpt-3.5-turbo">⚡ gpt-3.5-turbo (Fast & affordable)</option>
+            </select>
+            <small style="color: #666; display: block; margin-top: 0.2em; margin-bottom: 1em;">
+                💡 <strong>Model Guide:</strong> Use <strong>gpt-5</strong> for the highest quality results. For other needs, <strong>gpt-4o</strong> offers a great balance of capability and cost.
+            </small>
+            <small style="color: #666; display: block; margin-top: 0.2em; margin-bottom: 1em;">
+                🔗 Sources: <a href="https://openai.com" target="_blank" rel="noopener">@OpenAI</a> ·
+                <a href="https://platform.openai.com/docs/overview" target="_blank" rel="noopener">@openai_docs</a>
+            </small>
+            <br>
+            <label for="temperature">Temperature:</label>
+            <input type="range" id="temperature" name="temperature" min="0" max="2" step="0.1" value="1">
+            <span id="temperature-value">1.0</span>
+            <br>
+            <label for="max_tokens">Max Tokens:</label>
+            <input type="number" id="max_tokens" name="max_tokens" value="6000">
+            <br>
+            <label for="max_iterations">Max Iterations:</label>
+            <input type="number" id="max_iterations" name="max_iterations" value="5" min="1" max="10">
+            <br>
+            <label for="iterate_until_satisfied">
+                <input type="checkbox" id="iterate_until_satisfied" name="iterate_until_satisfied">
+                Iterate until satisfaction is achieved (ignore max iterations)
+            </label>
+            <small style="color: #666; display: block; margin-left: 1.2em; margin-top: 0.2em;">⚠️ This may result in many iterations and higher costs</small>
+            <br>
+
+            <label for="evaluation_criteria">Evaluation Criteria (prompt_refinement.md loaded as default):</label>
+            {% if has_default_criteria %}
+            <small style="color: #28a745; margin-bottom: 0.5em; display: block;">📋 Default pharma/audio expert evaluation criteria from prompt_refinement.md is automatically loaded. You can modify or replace this content.</small>
+            {% else %}
+            <small style="color: #dc3545; margin-bottom: 0.5em; display: block;">⚠️ prompt_refinement.md not found - please provide your evaluation criteria or leave blank for automatic generation.</small>
+            {% endif %}
+            <textarea id="evaluation_criteria" name="evaluation_criteria">{{ default_evaluation_criteria }}</textarea><br>
+
+            <button typey="submit" id="submit-btn">Start Refinement</button>
+        </form>
+    </div>
+
+    <!-- Session Loader Notification -->
+    <div id="session-loader" style="display: none; margin-top: 2em; padding: 1em; border-radius: 8px; background-color: #e3f2fd; border: 1px solid #1976d2;">
+        <h3 style="color: #1565c0; margin-bottom: 1em;">💾 Previous Session Loaded</h3>
+        <p style="margin: 0.5em 0;">Results from <strong id="session-timestamp"></strong> have been automatically loaded below.</p>
+        <button onclick="document.getElementById('session-loader').style.display='none'" style="padding: 0.6em 1.2em; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+            Dismiss
+        </button>
     </div>
 
     <div id="status" aria-live="polite" style="margin-top: 1em;"></div>
@@ -178,24 +246,292 @@
         </div>
     </div>
 
-    <!-- Session Results Section -->
-    <div id="sessionResults" style="margin-top: 2em; padding: 1em; border-radius: 8px; background-color: #f8f9fa; border: 1px solid #e0e0e0; display: none;">
-        <h3 style="color: #1976d2; margin-bottom: 1em;">💾 Last Session Results</h3>
-        <div style="display: flex; gap: 1em; margin-bottom: 1em;">
-            <button onclick="loadLastSession()" style="padding: 0.6em 1.2em; background-color: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                🔄 Load Last Session
-            </button>
-            <button onclick="clearSessionData()" style="padding: 0.6em 1.2em; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                🗑️ Clear Session Data
-            </button>
-        </div>
-        <div id="sessionContent">
-            <p style="color: #666; font-style: italic;">No session data available</p>
-        </div>
-    </div>
+    <!-- This section is now legacy and will not be used. -->
+    <div id="sessionResults" style="display: none;"></div>
 
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script>
+        const socket = io();
+
+        const statusDiv = document.getElementById('status');
+        const resultsDiv = document.getElementById('results');
+        const refinedPromptDiv = document.getElementById('refined-prompt');
+        const historyDiv = document.getElementById('history');
+        const submitBtn = document.getElementById('submit-btn');
+        const progressLog = document.getElementById('progress-log');
+        const logContent = document.getElementById('log-content');
+
+        // New DOM Elements
+        const sessionLoader = document.getElementById('session-loader');
+        const sessionTimestamp = document.getElementById('session-timestamp');
+        const originalPromptDisplay = document.getElementById('original-prompt');
+        const refinedPromptComparisonDisplay = document.getElementById('refined-prompt-comparison');
+        const changeStatsDisplay = document.getElementById('change-stats');
+        const scoresContent = document.getElementById('scoresContent');
+
+
+        window.addEventListener('load', () => {
+            console.log("Page loaded. Checking for last session data.");
+            fetch('/api/last-session')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("Received session data:", data);
+                    if (data && data.timestamp) {
+                        console.log("Session data is valid. Displaying loader and loading results.");
+                        sessionTimestamp.textContent = new Date(data.timestamp).toLocaleString();
+                        sessionLoader.style.display = 'block';
+                        // Automatically load and display the session results
+                        handleComplete(data);
+                    } else {
+                        console.log("No valid session data found.");
+                        sessionLoader.style.display = 'none';
+                    }
+                })
+                .catch(error => {
+                    console.error("Error fetching last session:", error);
+                    sessionLoader.style.display = 'none';
+                });
+        });
+
+
+        socket.on('connect', function() {
+            console.log('Socket.IO connected');
+        });
+
+        socket.on('disconnect', function() {
+            console.log('Socket.IO disconnected');
+        });
+
+        socket.on('progress', function(data) {
+            statusDiv.innerHTML = `<p> ${data.message}</p>`;
+            const logEntry = document.createElement('div');
+            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${data.message}`;
+            logContent.appendChild(logEntry);
+            progressLog.scrollTop = progressLog.scrollHeight; // Auto-scroll
+        });
+
+        socket.on('complete', function(data) {
+            console.log("Refinement complete. Data:", data);
+            handleComplete(data);
+        });
+
+        socket.on('error', function(data) {
+            statusDiv.innerHTML = `<p style="color: red;">Error: ${data.error}</p>`;
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Start Refinement';
+        });
+
+        document.getElementById('refinement-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Refining...';
+            statusDiv.innerHTML = '<p>Starting refinement process...</p>';
+            logContent.innerHTML = ''; // Clear previous logs
+            progressLog.style.display = 'block';
+            resultsDiv.style.display = 'none';
+            
+            const formData = {
+                prompt: document.getElementById('prompt').value,
+                attachments: document.getElementById('attachments').value,
+                model: document.getElementById('model').value,
+                temperature: document.getElementById('temperature').value,
+                max_tokens: document.getElementById('max_tokens').value,
+                max_iterations: document.getElementById('max_iterations').value,
+                iterate_until_satisfied: document.getElementById('iterate_until_satisfied').checked,
+                evaluation_criteria: document.getElementById('evaluation_criteria').value
+            };
+            console.log("Submitting refinement request:", formData);
+            socket.emit('start_refinement', formData);
+        });
+
+        function handleComplete(data) {
+            statusDiv.innerHTML = '<p style="color: green; font-weight: bold;">Refinement process completed!</p>';
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Start Refinement';
+            progressLog.style.display = 'none';
+
+            // Populate results
+            refinedPromptDiv.textContent = data.final_prompt;
+            originalPromptDisplay.textContent = data.original_prompt;
+            refinedPromptComparisonDisplay.textContent = data.final_prompt;
+
+            // Populate history
+            historyDiv.innerHTML = ''; // Clear previous history
+            if (data.history && data.history.length > 0) {
+                data.history.forEach((item, index) => {
+                    const stepDiv = document.createElement('div');
+                    stepDiv.style.marginBottom = '1.5em';
+                    stepDiv.style.paddingBottom = '1em';
+                    stepDiv.style.borderBottom = '1px solid #eee';
+
+                    let content = `
+                        <h5 style="color: #1976d2;">Iteration ${index + 1}</h5>
+                        <p><strong>Critique:</strong> ${item.critique}</p>
+                    `;
+                    
+                    // Add LLM scores if available
+                    if (item.llm_scores && Object.keys(item.llm_scores).length > 0) {
+                        content += `<p><strong>LLM Scores:</strong></p>`;
+                        content += `<div style="background: #f8f9fa; padding: 0.5em; border-radius: 4px; margin: 0.5em 0;">`;
+                        
+                        const scores = item.llm_scores;
+                        if (scores.overall_readiness !== undefined) {
+                            content += `Overall Readiness: ${scores.overall_readiness.toFixed(1)}/10 `;
+                        }
+                        if (scores.confidence !== undefined) {
+                            content += `| Confidence: ${scores.confidence.toFixed(1)}/10 `;
+                        }
+                        if (scores.content_accuracy !== undefined) {
+                            content += `| Content: ${scores.content_accuracy.toFixed(1)}/10`;
+                        }
+                        
+                        content += `</div>`;
+                    }
+                    
+                    content += `
+                        <p><strong>Refined Prompt:</strong></p>
+                        <pre style="background: #f5f5f5; padding: 0.5em; border-radius: 4px; white-space: pre-wrap;">${item.refined_prompt || item.prompt}</pre>
+                    `;
+                    stepDiv.innerHTML = content;
+                    historyDiv.appendChild(stepDiv);
+                });
+            } else {
+                historyDiv.textContent = 'No history data available.';
+            }
+
+            // Populate scores
+            scoresContent.innerHTML = '';
+            console.log("Processing scores data:", data.final_scores);
+            
+            if (data.final_scores && Object.keys(data.final_scores).length > 0) {
+                const table = document.createElement('table');
+                table.style.width = '100%';
+                table.style.borderCollapse = 'collapse';
+                
+                let tableContent = `
+                    <thead>
+                        <tr>
+                            <th style="border: 1px solid #ddd; padding: 8px; text-align: left; background-color: #f2f2f2;">Metric</th>
+                            <th style="border: 1px solid #ddd; padding: 8px; text-align: left; background-color: #f2f2f2;">Score</th>
+                            <th style="border: 1px solid #ddd; padding: 8px; text-align: left; background-color: #f2f2f2;">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                `;
+                
+                // Display key metrics in a user-friendly way
+                const metrics = {
+                    'overall_readiness': 'Overall Readiness',
+                    'confidence': 'Confidence Level',
+                    'content_accuracy': 'Content Accuracy',
+                    'completeness': 'Completeness',
+                    'audio_clarity': 'Audio Clarity',
+                    'pharma_compliance': 'Pharma Compliance',
+                    'refinement_quality': 'Refinement Quality',
+                    'directional_correctness': 'Direction Correctness'
+                };
+                
+                for (const [key, displayName] of Object.entries(metrics)) {
+                    if (data.final_scores[key] !== undefined) {
+                        const score = data.final_scores[key];
+                        let description = '';
+                        
+                        if (typeof score === 'number') {
+                            if (score >= 8) description = 'Excellent';
+                            else if (score >= 6) description = 'Good';
+                            else if (score >= 4) description = 'Fair';
+                            else description = 'Needs Improvement';
+                        }
+                        
+                        tableContent += `
+                            <tr>
+                                <td style="border: 1px solid #ddd; padding: 8px;">${displayName}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">${typeof score === 'number' ? score.toFixed(1) : score}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px;">${description}</td>
+                            </tr>
+                        `;
+                    }
+                }
+                
+                // Add reasoning if available
+                if (data.final_scores.reasoning) {
+                    tableContent += `
+                        <tr>
+                            <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">Reasoning</td>
+                            <td colspan="2" style="border: 1px solid #ddd; padding: 8px;">${data.final_scores.reasoning}</td>
+                        </tr>
+                    `;
+                }
+                
+                tableContent += '</tbody>';
+                table.innerHTML = tableContent;
+                scoresContent.appendChild(table);
+            } else {
+                scoresContent.innerHTML = '<p style="color: #666; font-style: italic;">No scoring data available for this session.</p>';
+            }
+
+            // Calculate and display diff summary
+            const originalLines = data.original_prompt.split('\n').length;
+            const finalLines = data.final_prompt.split('\n').length;
+            const lineChange = finalLines - originalLines;
+            changeStatsDisplay.innerHTML = `
+                <p><strong>Line Count:</strong> ${originalLines} ➔ ${finalLines} (${lineChange > 0 ? '+' : ''}${lineChange})</p>
+            `;
+
+            resultsDiv.style.display = 'block';
+            showTab('final-tab', document.querySelector('.tab-button')); // Show the first tab by default
+            sessionLoader.style.display = 'none'; // Hide loader once results are shown
+        }
+
+        function loadLastSession() {
+            console.log("Loading last session...");
+            statusDiv.innerHTML = '<p>Loading last session data...</p>';
+            fetch('/api/last-session')
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.final_prompt) {
+                        console.log("Last session data loaded successfully:", data);
+                        handleComplete(data);
+                        statusDiv.innerHTML = '<p style="color: green;">Last session loaded successfully.</p>';
+                    } else {
+                        console.error("Failed to load valid session data.");
+                        statusDiv.innerHTML = '<p style="color: red;">Could not load last session data.</p>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading last session:', error);
+                    statusDiv.innerHTML = `<p style="color: red;">Error loading session: ${error.message}</p>`;
+                });
+        }
+
+        function showTab(tabId, buttonElement) {
+            // Hide all tab content
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.style.display = 'none';
+            });
+            // Deactivate all tab buttons
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.classList.remove('active');
+                button.style.borderBottom = '3px solid transparent';
+            });
+            // Show the selected tab content
+            document.getElementById(tabId).style.display = 'block';
+            // Activate the selected tab button
+            buttonElement.classList.add('active');
+            buttonElement.style.borderBottom = '3px solid #1976d2';
+        }
+
+        // This function is no longer needed as there's no persistent client-side data to clear.
+        function clearSessionData() {
+            console.log("Clear session data called - this function is deprecated.");
+            document.getElementById('sessionResults').style.display = 'none';
+        }
+
         document.getElementById('temperature').addEventListener('input', function(event) {
             document.getElementById('temperature-value').textContent = event.target.value;
         });
@@ -210,435 +546,6 @@
                 maxIterationsInput.style.opacity = '1';
                 maxIterationsInput.title = '';
             }
-        });
-
-        const form = document.getElementById('refine-form');
-        let socket = null;
-        
-        function initializeSocket() {
-            if (socket) return socket;
-            socket = io();
-            
-            socket.on('progress', function(data) {
-                const statusEl = document.getElementById('status');
-                statusEl.style.color = '#333';
-                statusEl.innerHTML = `⏳ ${data.message}`;
-                addLogEntry(data.message, data.emoji || '📝');
-            });
-            
-            socket.on('error', function(data) {
-                const statusEl = document.getElementById('status');
-                statusEl.style.color = '#b00020';
-                statusEl.textContent = 'Error: ' + data.message;
-                addLogEntry('❌ ' + data.message, '❌');
-                resetForm();
-            });
-            
-            socket.on('complete', function(data) {
-                handleComplete(data);
-                resetForm();
-            });
-            
-            return socket;
-        }
-        
-        function resetForm() {
-            const submitBtn = form.querySelector('button[type="submit"]');
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Refine Prompt';
-        }
-        
-        function addLogEntry(message, emoji = '📝') {
-            const logContent = document.getElementById('log-content');
-            const entry = document.createElement('div');
-            entry.style.marginBottom = '0.5em';
-            entry.innerHTML = `${emoji} ${message}`;
-            logContent.appendChild(entry);
-            logContent.scrollTop = logContent.scrollHeight;
-        }
-        
-        function showTab(tabId, buttonElement) {
-            // Hide all tab contents
-            document.querySelectorAll('.tab-content').forEach(tab => {
-                tab.style.display = 'none';
-            });
-            
-            // Remove active class from all buttons
-            document.querySelectorAll('.tab-button').forEach(button => {
-                button.style.borderBottomColor = 'transparent';
-                button.classList.remove('active');
-            });
-            
-            // Show selected tab and mark button as active
-            document.getElementById(tabId).style.display = 'block';
-            buttonElement.style.borderBottomColor = '#1976d2';
-            buttonElement.classList.add('active');
-        }
-        
-        function calculateDifference(original, refined) {
-            const originalWords = original.split(/\s+/).length;
-            const refinedWords = refined.split(/\s+/).length;
-            const wordDiff = refinedWords - originalWords;
-            
-            const originalLines = original.split('\n').length;
-            const refinedLines = refined.split('\n').length;
-            const lineDiff = refinedLines - originalLines;
-            
-            // Simple character-based changes estimate
-            const originalChars = original.length;
-            const refinedChars = refined.length;
-            const charDiff = refinedChars - originalChars;
-            
-            return {
-                wordDiff,
-                lineDiff,
-                charDiff,
-                wordChange: ((wordDiff / originalWords) * 100).toFixed(1),
-                sizeChange: ((charDiff / originalChars) * 100).toFixed(1)
-            };
-        }
-        
-        function highlightKeyChanges(original, refined) {
-            // Simple highlighting of major structural changes
-            const changes = [];
-            
-            // Check for new sections/headers
-            const originalHeaders = original.match(/\*\*[^*]+\*\*/g) || [];
-            const refinedHeaders = refined.match(/\*\*[^*]+\*\*/g) || [];
-            
-            const newHeaders = refinedHeaders.filter(h => !originalHeaders.includes(h));
-            if (newHeaders.length > 0) {
-                changes.push(`Added ${newHeaders.length} new section(s): ${newHeaders.slice(0, 2).map(h => h.replace(/\*\*/g, '')).join(', ')}${newHeaders.length > 2 ? '...' : ''}`);
-            }
-            
-            // Check for structural improvements
-            if (refined.includes('### ') && !original.includes('### ')) {
-                changes.push('Improved structure with clearer section headings');
-            }
-            
-            if (refined.length > original.length * 1.2) {
-                changes.push('Significantly expanded with more detailed instructions');
-            } else if (refined.length < original.length * 0.8) {
-                changes.push('Streamlined and made more concise');
-            }
-            
-            // Check for specific improvements
-            if (refined.includes('Clinical Implications') && !original.includes('Clinical Implications')) {
-                changes.push('Added clinical implications section');
-            }
-            
-            if (refined.includes('Safety Information') && !original.includes('Safety Information')) {
-                changes.push('Enhanced safety information guidelines');
-            }
-            
-            return changes.length > 0 ? changes : ['General improvements to clarity and structure'];
-        }
-        
-        function handleComplete(data) {
-            addLogEntry(`✅ Processing complete! Generated ${data.iterations} iteration(s)`, '🎉');
-            
-            const escapeHtml = (unsafe) => {
-                return unsafe
-                    .replaceAll('&', '&amp;')
-                    .replaceAll('<', '&lt;')
-                    .replaceAll('>', '&gt;');
-            };
-            
-            // Get the original prompt from the first iteration or form
-            const originalPrompt = data.history && data.history.length > 0 
-                ? data.history[0].prompt 
-                : document.getElementById('prompt').value;
-            
-            // Populate Final Result Tab
-            const refinedPromptEl = document.getElementById('refined-prompt');
-            refinedPromptEl.textContent = data.refined_prompt;
-            
-            // Populate Comparison Tab
-            const originalPromptEl = document.getElementById('original-prompt');
-            const refinedPromptComparisonEl = document.getElementById('refined-prompt-comparison');
-            originalPromptEl.textContent = originalPrompt;
-            refinedPromptComparisonEl.textContent = data.refined_prompt;
-            
-            // Calculate and display differences
-            const diff = calculateDifference(originalPrompt, data.refined_prompt);
-            const keyChanges = highlightKeyChanges(originalPrompt, data.refined_prompt);
-            
-            const changeStatsEl = document.getElementById('change-stats');
-            changeStatsEl.innerHTML = `
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1em; margin-bottom: 1em;">
-                    <div style="background: #e3f2fd; padding: 0.8em; border-radius: 4px;">
-                        <strong>📏 Length Change:</strong><br>
-                        ${diff.charDiff > 0 ? '+' : ''}${diff.charDiff} characters (${diff.sizeChange > 0 ? '+' : ''}${diff.sizeChange}%)
-                    </div>
-                    <div style="background: #f3e5f5; padding: 0.8em; border-radius: 4px;">
-                        <strong>📝 Word Count:</strong><br>
-                        ${diff.wordDiff > 0 ? '+' : ''}${diff.wordDiff} words (${diff.wordChange > 0 ? '+' : ''}${diff.wordChange}%)
-                    </div>
-                    <div style="background: #e8f5e8; padding: 0.8em; border-radius: 4px;">
-                        <strong>📋 Structure:</strong><br>
-                        ${diff.lineDiff > 0 ? '+' : ''}${diff.lineDiff} lines
-                    </div>
-                </div>
-                <div style="background: #fff3e0; padding: 1em; border-radius: 4px;">
-                    <strong>🎯 Key Improvements:</strong>
-                    <ul style="margin: 0.5em 0;">
-                        ${keyChanges.map(change => `<li>${change}</li>`).join('')}
-                    </ul>
-                </div>
-            `;
-            
-            // Populate History Tab
-            const historyDiv = document.getElementById('history');
-            historyDiv.innerHTML = '';
-
-            // Show each iteration
-            data.history.forEach((item, index) => {
-                const iterationDiv = document.createElement('div');
-                iterationDiv.style.borderBottom = '1px solid #eee';
-                iterationDiv.style.paddingBottom = '1em';
-                iterationDiv.style.marginBottom = '1em';
-                iterationDiv.style.backgroundColor = '#fafafa';
-                iterationDiv.style.padding = '1em';
-                iterationDiv.style.borderRadius = '4px';
-                iterationDiv.innerHTML = `
-                    <h4 style="color: #1976d2;">🔄 Iteration ${index + 1}</h4>
-                    <div style="margin-bottom: 1em;">
-                        <strong>📝 Current Prompt:</strong>
-                        <div style="background: #f5f5f5; padding: 0.5em; margin-top: 0.5em; border-radius: 4px; font-family: monospace; white-space: pre-wrap; max-height: 200px; overflow-y: auto;">${escapeHtml(item.prompt)}</div>
-                    </div>
-                    <div style="margin-bottom: 1em;">
-                        <strong>🎯 Review Criteria:</strong>
-                        <div style="background: #fff3e0; padding: 0.5em; margin-top: 0.5em; border-radius: 4px; max-height: 150px; overflow-y: auto;">${escapeHtml(item.evaluation_criteria)}</div>
-                    </div>
-                    <div style="margin-bottom: 1em;">
-                        <strong>📋 Analysis & Critique:</strong>
-                        <div style="background: ${item.critique.includes('SATISFIED') ? '#e8f5e8' : '#fff8e1'}; padding: 0.5em; margin-top: 0.5em; border-radius: 4px; max-height: 150px; overflow-y: auto;">${escapeHtml(item.critique)}</div>
-                    </div>
-                `;
-                historyDiv.appendChild(iterationDiv);
-            });
-            
-            // Show results and update status
-            document.getElementById('results').style.display = 'block';
-            const suffix = data.satisfied ? 'prompt satisfied ✨' : 'stopped at max iterations ⏹️';
-            const statusEl = document.getElementById('status');
-            statusEl.style.color = '#1b5e20';
-            statusEl.innerHTML = `✅ <strong>Complete!</strong> ${data.iterations} iteration(s), ${suffix}<br>
-                📊 Model: ${data.model} | 🌡️ Temp: ${data.temperature} | 🔢 Max tokens: ${data.max_tokens}<br>
-                ${data.saved_file ? `💾 Saved as: ${data.saved_file}` : ''}`;
-            addLogEntry(`🏁 Refinement complete: ${data.iterations} iterations, ${suffix}`, '🎯');
-            if (data.saved_file) {
-                addLogEntry(`💾 Saved to file: ${data.saved_file}`, '💾');
-            }
-
-            // Display LLM scores if available
-            if (data.final_scores) {
-                document.getElementById('scoresContent').innerHTML = displayLLMScores(data.final_scores);
-                addLogEntry('📊 LLM evaluation scores calculated', '📊');
-            }
-            
-            // Scroll to results
-            document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
-        }
-
-        document.getElementById('refine-form').addEventListener('submit', async function(event) {
-            event.preventDefault();
-
-            const prompt = document.getElementById('prompt').value;
-            const attachments = document.getElementById('attachments').value;
-            const model = document.getElementById('model').value;
-            const temperature = document.getElementById('temperature').value;
-            const max_tokens = document.getElementById('max_tokens').value;
-            const max_iterations = document.getElementById('max_iterations').value;
-            const evaluation_criteria = document.getElementById('evaluation_criteria').value;
-
-            const statusEl = document.getElementById('status');
-            statusEl.style.color = '#333';
-            statusEl.innerHTML = '⏳ Starting refinement process...';
-            
-            const progressLog = document.getElementById('progress-log');
-            const logContent = document.getElementById('log-content');
-            progressLog.style.display = 'block';
-            logContent.innerHTML = '';
-            
-            const submitBtn = form.querySelector('button[type="submit"]');
-            const oldBtnText = submitBtn.textContent;
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Refining…';
-
-            // Always use WebSocket streaming for real-time updates
-            addLogEntry(`🚀 Starting real-time refinement with ${model}`, '🚀');
-            const socket = initializeSocket();
-            
-            socket.emit('start_refinement', {
-                prompt,
-                attachments,
-                model,
-                temperature,
-                max_tokens,
-                max_iterations,
-                evaluation_criteria,
-                iterate_until_satisfied: document.getElementById('iterate_until_satisfied').checked
-            });
-        });
-
-        // Session Management Functions
-        function loadLastSession() {
-            console.log('Loading last session...');
-            fetch('/api/last-session')
-                .then(response => {
-                    console.log('Response status:', response.status);
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('Session data received:', data);
-                    if (data.error) {
-                        document.getElementById('sessionContent').innerHTML = 
-                            `<p style="color: #d32f2f;">❌ Error: ${data.error}</p>`;
-                        return;
-                    }
-                    
-                    displaySessionResults(data);
-                    document.getElementById('sessionResults').style.display = 'block';
-                })
-                .catch(error => {
-                    console.error('Error loading session:', error);
-                    document.getElementById('sessionContent').innerHTML = 
-                        `<p style="color: #d32f2f;">❌ Failed to load session data</p>`;
-                });
-        }
-
-        function displaySessionResults(sessionData) {
-            console.log('Displaying session results:', sessionData);
-            const content = document.getElementById('sessionContent');
-            let html = '';
-            
-            if (sessionData.timestamp) {
-                html += `<p><strong>Session:</strong> ${new Date(sessionData.timestamp).toLocaleString()}</p>`;
-            }
-            
-            if (sessionData.model) {
-                html += `<p><strong>Model:</strong> ${sessionData.model}</p>`;
-            }
-            
-            if (sessionData.iterations_completed !== undefined) {
-                html += `<p><strong>Iterations:</strong> ${sessionData.iterations_completed}</p>`;
-            }
-            
-            if (sessionData.total_tokens !== undefined) {
-                html += `<p><strong>Total Tokens:</strong> ${sessionData.total_tokens.toLocaleString()}</p>`;
-            }
-
-            if (sessionData.refined_prompt || sessionData.final_prompt) {
-                const finalPrompt = sessionData.final_prompt || sessionData.refined_prompt;
-                html += `
-                    <div style="margin: 1em 0;">
-                        <h5 style="color: #1b5e20;">🎯 Final Refined Prompt:</h5>
-                        <div style="background: #f0f8ff; padding: 1em; border-radius: 4px; border-left: 4px solid #1976d2; font-family: monospace; white-space: pre-wrap; max-height: 300px; overflow-y: auto;">
-                            ${finalPrompt}
-                        </div>
-                    </div>
-                `;
-            }
-            
-            if (sessionData.final_scores) {
-                console.log('Adding scores to display:', sessionData.final_scores);
-                html += displayLLMScores(sessionData.final_scores);
-            }
-            
-            content.innerHTML = html;
-            
-            // Also populate the scores tab if scores exist
-            if (sessionData.final_scores) {
-                document.getElementById('scoresContent').innerHTML = displayLLMScores(sessionData.final_scores);
-            }
-        }
-
-        function displayLLMScores(scores) {
-            console.log('displayLLMScores called with:', scores);
-            if (!scores || typeof scores !== 'object') {
-                console.log('No valid scores provided');
-                return '';
-            }
-            
-            let html = `
-                <div style="margin: 1em 0;">
-                    <h5 style="color: #1976d2;">📊 LLM Evaluation Scores:</h5>
-                    <div style="background: #fff; padding: 1em; border-radius: 8px; border: 1px solid #e0e0e0;">
-            `;
-            
-            const scoreLabels = {
-                'content_accuracy': 'Content Accuracy',
-                'completeness': 'Completeness', 
-                'audio_clarity': 'Audio Clarity',
-                'pharma_compliance': 'Pharma Compliance',
-                'refinement_quality': 'Refinement Quality',
-                'diminishing_returns': 'Diminishing Returns',
-                'directional_correctness': 'Directional Correctness',
-                'overall_readiness': 'Overall Readiness'
-            };
-            
-            Object.entries(scores).forEach(([key, value]) => {
-                if (scoreLabels[key] && typeof value === 'number') {
-                    const percentage = (value / 10) * 100;
-                    const color = getScoreColor(value);
-                    
-                    html += `
-                        <div style="margin: 0.8em 0;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3em;">
-                                <span style="font-weight: bold;">${scoreLabels[key]}</span>
-                                <span style="color: ${color}; font-weight: bold;">${value.toFixed(1)}/10</span>
-                            </div>
-                            <div style="background: #f0f0f0; border-radius: 10px; height: 20px; overflow: hidden;">
-                                <div style="background: linear-gradient(90deg, ${color}, ${color}aa); width: ${percentage}%; height: 100%; transition: width 0.3s ease;"></div>
-                            </div>
-                        </div>
-                    `;
-                }
-            });
-            
-            html += `</div></div>`;
-            return html;
-        }
-
-        function getScoreColor(score) {
-            if (score >= 8) return '#2e7d32';      // Green
-            if (score >= 6) return '#f57c00';      // Orange  
-            if (score >= 4) return '#ef6c00';      // Dark orange
-            return '#d32f2f';                      // Red
-        }
-
-        function clearSessionData() {
-            document.getElementById('sessionContent').innerHTML = 
-                '<p style="color: #666; font-style: italic;">No session data available</p>';
-            document.getElementById('scoresContent').innerHTML = 
-                '<p style="color: #666; font-style: italic;">No scoring data available for current session</p>';
-            document.getElementById('sessionResults').style.display = 'none';
-        }
-
-        // Check for existing session data on page load
-        window.addEventListener('load', function() {
-            fetch('/api/last-session')
-                .then(response => response.json())
-                .then(data => {
-                    if (!data.error && data.timestamp) {
-                        // Show a subtle notification that session data is available
-                        const sessionDiv = document.getElementById('sessionResults');
-                        sessionDiv.style.display = 'block';
-                        sessionDiv.style.border = '2px solid #1976d2';
-                        sessionDiv.innerHTML = `
-                            <h3 style="color: #1976d2; margin-bottom: 1em;">💾 Session Data Available</h3>
-                            <p style="margin: 0.5em 0;">Found results from: <strong>${new Date(data.timestamp).toLocaleString()}</strong></p>
-                            <button onclick="loadLastSession()" style="padding: 0.6em 1.2em; background-color: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-right: 1em;">
-                                🔄 Load Results
-                            </button>
-                            <button onclick="this.parentElement.style.display='none'" style="padding: 0.6em 1.2em; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                                Dismiss
-                            </button>
-                        `;
-                    }
-                })
-                .catch(error => console.log('No previous session found'));
         });
     </script>
 </body>
