@@ -160,6 +160,9 @@ REASONING: [2-3 sentences explaining key factors]
         
     except Exception as e:
         logger.error(f"Error in LLM scoring: {e}")
+        # Force immediate flush
+        for handler in logger.handlers:
+            handler.flush()
         return {
             'satisfied': "SATISFIED" in critique.upper(),
             'scores': {},
@@ -231,33 +234,58 @@ def parse_llm_scores(evaluation_text, previous_scores):
     }
 
 # Setup logging
-def setup_logging():
-    """Setup comprehensive logging for analysis"""
-    if not os.path.exists("logs"):
-        os.makedirs("logs")
+def setup_app_logging():
+    """Setup basic app logging (console only)"""
+    console_handler = logging.StreamHandler()
+    console_handler.flush = lambda: console_handler.stream.flush() if console_handler.stream else None
     
-    # Create a unique log file for each run
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_filename = f"logs/prompt_refiner_{timestamp}.log"
-    
-    # Configure logging
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s',
-        handlers=[
-            logging.FileHandler(log_filename, encoding='utf-8'),
-            logging.StreamHandler()  # Also log to console
-        ]
+        handlers=[console_handler],
+        force=True
     )
     
     logger = logging.getLogger(__name__)
-    logger.info(f"=== PROMPT REFINER SESSION STARTED ===")
-    logger.info(f"Log file: {log_filename}")
+    logger.info("=== PROMPT REFINER APPLICATION STARTED ===")
     logger.info(f"OpenAI API Key configured: {'Yes' if os.environ.get('OPENAI_API_KEY') else 'No'}")
     
     return logger
 
-logger = setup_logging()
+def setup_session_logging(session_id):
+    """Setup session-specific logging for each refinement session"""
+    if not os.path.exists("logs"):
+        os.makedirs("logs")
+    
+    # Create a unique log file for this session
+    log_filename = f"logs/prompt_refiner_{session_id}.log"
+    
+    # Create file handler with immediate flushing
+    file_handler = logging.FileHandler(log_filename, encoding='utf-8')
+    file_handler.flush = lambda: file_handler.stream.flush() if file_handler.stream else None
+    
+    # Get the existing logger and add the file handler
+    logger = logging.getLogger(__name__)
+    
+    # Remove any existing file handlers to avoid duplicate logs
+    logger.handlers = [h for h in logger.handlers if not isinstance(h, logging.FileHandler)]
+    
+    # Add the new session file handler
+    file_handler.setLevel(logging.INFO)
+    if hasattr(file_handler, 'stream'):
+        file_handler.stream.reconfigure(line_buffering=True)
+    logger.addHandler(file_handler)
+    
+    logger.info(f"=== PROMPT REFINER SESSION STARTED ===")
+    logger.info(f"Session ID: {session_id}")
+    logger.info(f"Log file: {log_filename}")
+    
+    # Force immediate write
+    file_handler.flush()
+    
+    return log_filename
+
+logger = setup_app_logging()
 
 # Session storage for last run results
 last_session_results = {
@@ -349,8 +377,11 @@ def handle_refinement(data):
     session_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     session_logs = []
     
+    # Setup session-specific logging
+    log_filename = setup_session_logging(session_id)
+    
     def log_and_emit(message, emoji='📝', level='info'):
-        """Helper function to log and emit simultaneously"""
+        """Helper function to log and emit simultaneously with immediate flush"""
         log_entry = {
             'timestamp': datetime.now().isoformat(),
             'message': message,
@@ -366,7 +397,14 @@ def handle_refinement(data):
             logger.info(f"[{session_id}] {message}")
             emit('progress', {'message': f'{emoji} {message}', 'emoji': emoji})
         
+        # Force immediate flush of all log handlers
+        for handler in logger.handlers:
+            handler.flush()
+        
         print(f"{emoji} {message}")
+        # Force stdout flush as well
+        import sys
+        sys.stdout.flush()
     
     log_and_emit("Starting refinement process via WebSocket", '🚀')
     
@@ -649,6 +687,14 @@ def handle_refinement(data):
     emit('complete', result)
     log_and_emit(f"Refinement complete: {iterations_done} iterations, satisfied={satisfied}", '🏁')
     logger.info(f"[{session_id}] FINAL REFINED PROMPT:\n{'='*50}\n{current_prompt}\n{'='*50}")
+    
+    # Force final flush and cleanup session logging
+    for handler in logger.handlers:
+        handler.flush()
+        # Remove session-specific file handlers to prevent accumulation
+        if isinstance(handler, logging.FileHandler) and handler.baseFilename.endswith(f'{session_id}.log'):
+            logger.removeHandler(handler)
+            handler.close()
 
 if __name__ == '__main__':
     socketio.run(app, debug=True, port=5001, host='127.0.0.1')
