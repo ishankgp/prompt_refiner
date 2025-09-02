@@ -71,6 +71,8 @@
         <select id="model" name="model">
             <option value="gpt-4o" selected>gpt-4o</option>
             <option value="gpt-4o-mini">gpt-4o-mini (cost-effective)</option>
+            <option value="gpt-5-turbo" style="color: #1976d2; font-weight: bold;">🆕 gpt-5-turbo (latest)</option>
+            <option value="gpt-5" style="color: #1976d2; font-weight: bold;">🆕 gpt-5 (premium)</option>
             <option value="gpt-4-turbo">gpt-4-turbo</option>
             <option value="gpt-4">gpt-4</option>
             <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
@@ -85,6 +87,12 @@
         <br>
         <label for="max_iterations">Max Iterations:</label>
         <input type="number" id="max_iterations" name="max_iterations" value="5" min="1" max="10">
+        <br>
+        <label for="iterate_until_satisfied">
+            <input type="checkbox" id="iterate_until_satisfied" name="iterate_until_satisfied">
+            Iterate until satisfaction is achieved (ignore max iterations)
+        </label>
+        <small style="color: #666; display: block; margin-left: 1.2em; margin-top: 0.2em;">⚠️ This may result in many iterations and higher costs</small>
         <br>
 
         <label for="review_prompt">Custom Review Prompt (optional):</label>
@@ -145,6 +153,18 @@
     <script>
         document.getElementById('temperature').addEventListener('input', function(event) {
             document.getElementById('temperature-value').textContent = event.target.value;
+        });
+
+        // Handle iterate until satisfied checkbox
+        document.getElementById('iterate_until_satisfied').addEventListener('change', function(event) {
+            const maxIterationsInput = document.getElementById('max_iterations');
+            if (event.target.checked) {
+                maxIterationsInput.style.opacity = '0.5';
+                maxIterationsInput.title = 'Disabled when iterating until satisfied';
+            } else {
+                maxIterationsInput.style.opacity = '1';
+                maxIterationsInput.title = '';
+            }
         });
 
         const form = document.getElementById('refine-form');
@@ -406,7 +426,8 @@
                 temperature,
                 max_tokens,
                 max_iterations,
-                review_prompt
+                review_prompt,
+                iterate_until_satisfied: document.getElementById('iterate_until_satisfied').checked
             });
         });
     </script>

@@ -149,15 +149,24 @@ def handle_refinement(data):
         temperature = float(data.get('temperature', 1.0))
         max_tokens = int(data.get('max_tokens', 6000))
         max_iterations = int(data.get('max_iterations', 5))
+        iterate_until_satisfied = data.get('iterate_until_satisfied', False)
     except (TypeError, ValueError):
         temperature, max_tokens, max_iterations = 1.0, 6000, 5
+        iterate_until_satisfied = False
         log_and_emit(f"Invalid parameters provided, using defaults", '⚠️')
         
     # Clamp ranges
     temperature = max(0.0, min(2.0, temperature))
-    max_iterations = max(1, min(10, max_iterations))
+    if not iterate_until_satisfied:
+        max_iterations = max(1, min(10, max_iterations))
+    else:
+        # Set a reasonable upper limit even for "iterate until satisfied"
+        max_iterations = 25  # Safety limit to prevent runaway iterations
     
-    log_and_emit(f"Parameters: temp={temperature}, tokens={max_tokens}, max_iter={max_iterations}", '⚙️')
+    if iterate_until_satisfied:
+        log_and_emit(f"Parameters: temp={temperature}, tokens={max_tokens}, iterating until satisfied (max {max_iterations})", '⚙️')
+    else:
+        log_and_emit(f"Parameters: temp={temperature}, tokens={max_tokens}, max_iter={max_iterations}", '⚙️')
     
     review_prompt_override = (data.get('review_prompt') or '').strip()
     
@@ -172,7 +181,10 @@ def handle_refinement(data):
 
     for i in range(max_iterations):
         iteration_num = i + 1
-        log_and_emit(f"Starting iteration {iteration_num}/{max_iterations}", '🔄')
+        if iterate_until_satisfied:
+            log_and_emit(f"Starting iteration {iteration_num} (iterating until satisfied)", '🔄')
+        else:
+            log_and_emit(f"Starting iteration {iteration_num}/{max_iterations}", '🔄')
         
         # 1. Get review prompt
         if review_prompt_override:
@@ -258,6 +270,11 @@ def handle_refinement(data):
             satisfied = True
             log_and_emit("Prompt is now satisfactory!", '🎉')
             break
+        elif iterate_until_satisfied and i == max_iterations - 1:
+            log_and_emit(f"Reached safety limit ({max_iterations} iterations) while iterating until satisfied", '⚠️')
+        elif not iterate_until_satisfied and i == max_iterations - 1:
+            # This will be the last iteration for fixed max_iterations mode
+            pass
 
         # 3. Refine
         log_and_emit("Refining prompt based on feedback...", '🔧')
@@ -296,7 +313,10 @@ def handle_refinement(data):
             return
 
     if not satisfied:
-        log_and_emit(f"Reached max iterations ({max_iterations})", '⏹️')
+        if iterate_until_satisfied:
+            log_and_emit(f"Reached safety limit ({max_iterations} iterations) without satisfaction", '⏹️')
+        else:
+            log_and_emit(f"Reached max iterations ({max_iterations})", '⏹️')
 
     # Save to file
     metadata = {
@@ -305,6 +325,7 @@ def handle_refinement(data):
         'max_tokens': max_tokens,
         'iterations': iterations_done,
         'satisfied': satisfied,
+        'iterate_until_satisfied': iterate_until_satisfied,
         'session_id': session_id
     }
     
