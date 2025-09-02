@@ -69,14 +69,18 @@
         <h3>Parameters</h3>
         <label for="model">Model:</label>
         <select id="model" name="model">
-            <option value="gpt-4o" selected>gpt-4o</option>
-            <option value="gpt-4o-mini">gpt-4o-mini (cost-effective)</option>
-            <option value="gpt-5-turbo" style="color: #1976d2; font-weight: bold;">🆕 gpt-5-turbo (latest)</option>
-            <option value="gpt-5" style="color: #1976d2; font-weight: bold;">🆕 gpt-5 (premium)</option>
-            <option value="gpt-4-turbo">gpt-4-turbo</option>
-            <option value="gpt-4">gpt-4</option>
-            <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+            <option value="gpt-5" selected>🚀 gpt-5 (Most capable)</option>
+            <option value="gpt-4o">🎯 gpt-4o (Recommended)</option>
+            <option value="gpt-4o-mini">💰 gpt-4o-mini (Cost‑effective)</option>
+            <option value="gpt-3.5-turbo">⚡ gpt-3.5-turbo (Fast & affordable)</option>
         </select>
+        <small style="color: #666; display: block; margin-top: 0.2em; margin-bottom: 1em;">
+            💡 <strong>Model Guide:</strong> Use <strong>gpt-5</strong> for the highest quality results. For other needs, <strong>gpt-4o</strong> offers a great balance of capability and cost.
+        </small>
+        <small style="color: #666; display: block; margin-top: 0.2em; margin-bottom: 1em;">
+            🔗 Sources: <a href="https://openai.com" target="_blank" rel="noopener">@OpenAI</a> ·
+            <a href="https://platform.openai.com/docs/overview" target="_blank" rel="noopener">@openai_docs</a>
+        </small>
         <br>
         <label for="temperature">Temperature:</label>
         <input type="range" id="temperature" name="temperature" min="0" max="2" step="0.1" value="1">
@@ -429,99 +433,6 @@
                 review_prompt,
                 iterate_until_satisfied: document.getElementById('iterate_until_satisfied').checked
             });
-        });
-    </script>
-</body>
-</html>                response = await fetch('/refine', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ 
-                        prompt, 
-                        attachments,
-                        model,
-                        temperature,
-                        max_tokens,
-                        max_iterations,
-                        review_prompt
-                    })
-                });
-
-                addLogEntry('Server response received, processing...', '📨');
-                const data = await response.json();
-
-                if (response.ok) {
-                    addLogEntry(`✅ Processing complete! Generated ${data.iterations} iteration(s)`, '🎉');
-                    
-                    const escapeHtml = (unsafe) => {
-                        return unsafe
-                            .replaceAll('&', '&amp;')
-                            .replaceAll('<', '&lt;')
-                            .replaceAll('>', '&gt;');
-                    };
-                    
-                    // Show the refined prompt prominently
-                    const refinedPromptEl = document.getElementById('refined-prompt');
-                    refinedPromptEl.textContent = data.refined_prompt;
-                    
-                    // Show history
-                    const historyDiv = document.getElementById('history');
-                    historyDiv.innerHTML = '';
-
-                    // Show each iteration with a small delay for better UX
-                    for (let index = 0; index < data.history.length; index++) {
-                        await new Promise(resolve => setTimeout(resolve, 300));
-                        addLogEntry(`📄 Displaying iteration ${index + 1} details...`, '�');
-                        
-                        const item = data.history[index];
-                        const iterationDiv = document.createElement('div');
-                        iterationDiv.style.borderBottom = '1px solid #eee';
-                        iterationDiv.style.paddingBottom = '1em';
-                        iterationDiv.style.marginBottom = '1em';
-                        iterationDiv.style.backgroundColor = '#fafafa';
-                        iterationDiv.style.padding = '1em';
-                        iterationDiv.style.borderRadius = '4px';
-                        iterationDiv.innerHTML = `
-                            <h4 style="color: #1976d2;">🔄 Iteration ${index + 1}</h4>
-                            <div style="margin-bottom: 1em;">
-                                <strong>📝 Current Prompt:</strong>
-                                <div style="background: #f5f5f5; padding: 0.5em; margin-top: 0.5em; border-radius: 4px; font-family: monospace; white-space: pre-wrap;">${escapeHtml(item.prompt)}</div>
-                            </div>
-                            <div style="margin-bottom: 1em;">
-                                <strong>🎯 Review Criteria:</strong>
-                                <div style="background: #fff3e0; padding: 0.5em; margin-top: 0.5em; border-radius: 4px;">${escapeHtml(item.review_prompt)}</div>
-                            </div>
-                            <div style="margin-bottom: 1em;">
-                                <strong>📋 Analysis & Critique:</strong>
-                                <div style="background: ${item.critique.includes('SATISFIED') ? '#e8f5e8' : '#fff8e1'}; padding: 0.5em; margin-top: 0.5em; border-radius: 4px;">${escapeHtml(item.critique)}</div>
-                            </div>
-                        `;
-                        historyDiv.appendChild(iterationDiv);
-                    }
-                    
-                    document.getElementById('results').style.display = 'block';
-                    const suffix = data.satisfied ? 'prompt satisfied ✨' : 'stopped at max iterations ⏹️';
-                    statusEl.style.color = '#1b5e20';
-                    statusEl.innerHTML = `✅ <strong>Complete!</strong> ${data.iterations} iteration(s), ${suffix}<br>
-                        📊 Model: ${data.model} | 🌡️ Temp: ${data.temperature} | 🔢 Max tokens: ${data.max_tokens}`;
-                    addLogEntry(`� Refinement complete: ${data.iterations} iterations, ${suffix}`, '�');
-                    
-                    // Scroll to results
-                    document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
-                } else {
-                    statusEl.style.color = '#b00020';
-                    statusEl.textContent = 'Error: ' + (data.error || 'Unknown error');
-                    addLogEntry('❌ ' + (data.error || 'Unknown error'), '❌');
-                }
-            } catch (e) {
-                statusEl.style.color = '#b00020';
-                statusEl.textContent = 'Network error. Please try again.';
-                addLogEntry('Network error: ' + e.message, '❌');
-            }
-
-            submitBtn.disabled = false;
-            submitBtn.textContent = oldBtnText;
         });
     </script>
 </body>

@@ -139,9 +139,9 @@ def handle_refinement(data):
         
     initial_prompt = data.get('prompt')
     attachments = data.get('attachments') or ""
-    model = data.get('model', 'gpt-4o')
+    model = data.get('model', 'gpt-5')
     
-    log_and_emit(f"Session ID: {session_id}", '�')
+    log_and_emit(f"Session ID: {session_id}", '🆔')
     log_and_emit(f"Starting refinement with {model}", '🚀')
     log_and_emit(f"Initial prompt: {initial_prompt[:100]}{'...' if len(initial_prompt) > 100 else ''}", '📝')
     
