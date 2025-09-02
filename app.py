@@ -56,6 +56,21 @@ def simple_satisfaction_check(current_prompt, critique, refinement_history, atta
         if all(len(c) < 100 for c in recent_critiques):  # Short critiques suggest minor issues
             is_satisfied = True
             reasoning = "Recent critiques indicate minor improvements only"
+        # Check for repeated similar critiques (suggesting stagnation)
+        elif len(refinement_history) >= 3:
+            last_three_critiques = [item['critique'] for item in refinement_history[-3:]]
+            # If all three critiques mention similar issues, consider it stagnant
+            common_words = set()
+            for crit in last_three_critiques:
+                words = set(crit.lower().split())
+                if not common_words:
+                    common_words = words
+                else:
+                    common_words = common_words.intersection(words)
+            
+            if len(common_words) > 5:  # Significant word overlap suggests repetitive feedback
+                is_satisfied = True
+                reasoning = "Repetitive critiques detected - potential improvement stagnation"
     
     # Basic scoring for display purposes
     basic_score = 8.0 if is_satisfied else 6.0
@@ -436,7 +451,7 @@ def handle_refinement(data):
             pass
 
         # 3. Refine prompt based on critique
-        log_and_emit("Refining prompt based on LLM feedback...", '🔧')
+        log_and_emit("Refining prompt based on feedback...", '🔧')
         
         refinement_prompt = f"""
         You are a prompt engineering expert. Your task is to REFINE THE INSTRUCTIONS/PROMPT below, NOT to execute them.
