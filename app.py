@@ -24,6 +24,36 @@ def load_default_attachment():
         logger.error(f"Error loading webpage.txt: {e}")
         return ""
 
+def load_default_evaluation_criteria():
+    """Load the default evaluation criteria from prompt_refinement.md"""
+    try:
+        with open('prompt_refinement.md', 'r', encoding='utf-8') as f:
+            content = f.read()
+        logger.info("Default evaluation criteria (prompt_refinement.md) loaded successfully")
+        return content
+    except FileNotFoundError:
+        logger.warning("prompt_refinement.md not found, will use fallback evaluation criteria")
+        return ""
+    except Exception as e:
+        logger.error(f"Error loading prompt_refinement.md: {e}")
+        return ""
+
+def get_model_params(model, temperature, max_tokens):
+    """Get appropriate parameters for different OpenAI models"""
+    # GPT-5 and newer models use max_completion_tokens instead of max_tokens
+    if model.startswith('gpt-5'):
+        return {
+            "model": model,
+            "temperature": temperature,
+            "max_completion_tokens": max_tokens
+        }
+    else:
+        return {
+            "model": model,
+            "temperature": temperature,
+            "max_tokens": max_tokens
+        }
+
 # Setup logging
 def setup_logging():
     """Setup comprehensive logging for analysis"""
@@ -94,7 +124,11 @@ def save_refined_prompt(original_prompt, refined_prompt, history, metadata, logs
 @app.route('/')
 def index():
     default_attachment = load_default_attachment()
-    return render_template('index.html', default_attachment=default_attachment)
+    default_evaluation_criteria = load_default_evaluation_criteria()
+    return render_template('index.html', 
+                         default_attachment=default_attachment,
+                         default_evaluation_criteria=default_evaluation_criteria,
+                         has_default_criteria=bool(default_evaluation_criteria))
 
 @socketio.on('connect')
 def handle_connect():
@@ -168,7 +202,7 @@ def handle_refinement(data):
     else:
         log_and_emit(f"Parameters: temp={temperature}, tokens={max_tokens}, max_iter={max_iterations}", '⚙️')
     
-    review_prompt_override = (data.get('review_prompt') or '').strip()
+    evaluation_criteria_override = (data.get('evaluation_criteria') or '').strip()
     
     if not initial_prompt:
         log_and_emit('Prompt is required', '❌', 'error')
@@ -178,22 +212,22 @@ def handle_refinement(data):
     history = []
     iterations_done = 0
     satisfied = False
-
-    for i in range(max_iterations):
-        iteration_num = i + 1
-        if iterate_until_satisfied:
-            log_and_emit(f"Starting iteration {iteration_num} (iterating until satisfied)", '🔄')
-        else:
-            log_and_emit(f"Starting iteration {iteration_num}/{max_iterations}", '🔄')
+    
+    # Load evaluation criteria ONCE at the beginning (not in every iteration)
+    if evaluation_criteria_override:
+        log_and_emit("Using your custom evaluation criteria", '📋')
+        evaluation_criteria = evaluation_criteria_override
+    else:
+        log_and_emit("Loading default pharma/audio expert evaluation criteria...", '🎯')
+        default_criteria = load_default_evaluation_criteria()
         
-        # 1. Get review prompt
-        if review_prompt_override:
-            log_and_emit("Using your custom review prompt", '📋')
-            review_prompt = review_prompt_override
+        if default_criteria:
+            evaluation_criteria = default_criteria
+            log_and_emit("Using prompt_refinement.md as evaluation criteria", '📋')
         else:
-            log_and_emit("Generating review criteria...", '🎯')
+            log_and_emit("Generating fallback evaluation criteria...", '🎯')
             
-            review_prompt_generation = f"""
+            criteria_generation = f"""
             Given the following user prompt, generate a concise "review prompt" to critique and identify gaps in the prompt.
             Focus on clarity, completeness, missing constraints, target audience, format/structure, and edge cases.
 
@@ -207,31 +241,37 @@ def handle_refinement(data):
             """
 
             try:
-                log_and_emit("Calling OpenAI API for review criteria...", '💬')
+                log_and_emit("Calling OpenAI API for evaluation criteria...", '💬')
+                api_params = get_model_params(model, temperature, max_tokens)
                 response = client.chat.completions.create(
-                    model=model,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
                     messages=[
-                        {"role": "system", "content": "You are a precise assistant that crafts prompt review checklists."},
-                        {"role": "user", "content": review_prompt_generation}
-                    ]
+                        {"role": "system", "content": "You are a precise assistant that crafts prompt evaluation checklists."},
+                        {"role": "user", "content": criteria_generation}
+                    ],
+                    **api_params
                 )
-                review_prompt = response.choices[0].message.content.strip()
-                log_and_emit(f"Review criteria generated: {review_prompt[:100]}...", '✅')
+                evaluation_criteria = response.choices[0].message.content.strip()
+                log_and_emit(f"Evaluation criteria generated: {evaluation_criteria[:100]}...", '✅')
             except Exception as e:
-                log_and_emit(f"Error generating review prompt: {e}", '❌', 'error')
+                log_and_emit(f"Error generating evaluation criteria: {e}", '❌', 'error')
                 return
 
-        # 2. Critique
+    for i in range(max_iterations):
+        iteration_num = i + 1
+        if iterate_until_satisfied:
+            log_and_emit(f"Starting iteration {iteration_num} (iterating until satisfied)", '🔄')
+        else:
+            log_and_emit(f"Starting iteration {iteration_num}/{max_iterations}", '🔄')
+        
+        # 1. Critique using loaded evaluation criteria (criteria already loaded before loop)
         log_and_emit("Analyzing current prompt...", '🔍')
         
         critique_prompt = f"""
-        Using the following review prompt, critique the user's prompt and list concrete improvements.
+        Using the following evaluation criteria, critique the user's prompt and list concrete improvements.
         If no improvements are necessary, respond with a single line containing exactly: SATISFIED
 
-        Review Prompt:
-        "{review_prompt}"
+        Evaluation Criteria:
+        "{evaluation_criteria}"
 
         Initial Prompt:
         "{current_prompt}"
@@ -261,7 +301,7 @@ def handle_refinement(data):
 
         history.append({
             'prompt': current_prompt,
-            'review_prompt': review_prompt,
+            'evaluation_criteria': evaluation_criteria,
             'critique': critique
         })
 

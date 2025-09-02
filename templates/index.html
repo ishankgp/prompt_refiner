@@ -99,8 +99,13 @@
         <small style="color: #666; display: block; margin-left: 1.2em; margin-top: 0.2em;">⚠️ This may result in many iterations and higher costs</small>
         <br>
 
-        <label for="review_prompt">Custom Review Prompt (optional):</label>
-        <textarea id="review_prompt" name="review_prompt" placeholder="Provide your own review checklist/prompt. If blank, the app will generate one."></textarea><br>
+        <label for="evaluation_criteria">Evaluation Criteria (prompt_refinement.md loaded as default):</label>
+        {% if has_default_criteria %}
+        <small style="color: #28a745; margin-bottom: 0.5em; display: block;">📋 Default pharma/audio expert evaluation criteria from prompt_refinement.md is automatically loaded. You can modify or replace this content.</small>
+        {% else %}
+        <small style="color: #dc3545; margin-bottom: 0.5em; display: block;">⚠️ prompt_refinement.md not found - please provide your evaluation criteria or leave blank for automatic generation.</small>
+        {% endif %}
+        <textarea id="evaluation_criteria" name="evaluation_criteria">{{ default_evaluation_criteria }}</textarea><br>
 
         <button type="submit">Refine Prompt</button>
     </form>
@@ -367,7 +372,7 @@
                     </div>
                     <div style="margin-bottom: 1em;">
                         <strong>🎯 Review Criteria:</strong>
-                        <div style="background: #fff3e0; padding: 0.5em; margin-top: 0.5em; border-radius: 4px; max-height: 150px; overflow-y: auto;">${escapeHtml(item.review_prompt)}</div>
+                        <div style="background: #fff3e0; padding: 0.5em; margin-top: 0.5em; border-radius: 4px; max-height: 150px; overflow-y: auto;">${escapeHtml(item.evaluation_criteria)}</div>
                     </div>
                     <div style="margin-bottom: 1em;">
                         <strong>📋 Analysis & Critique:</strong>
@@ -403,7 +408,7 @@
             const temperature = document.getElementById('temperature').value;
             const max_tokens = document.getElementById('max_tokens').value;
             const max_iterations = document.getElementById('max_iterations').value;
-            const review_prompt = document.getElementById('review_prompt').value;
+            const evaluation_criteria = document.getElementById('evaluation_criteria').value;
 
             const statusEl = document.getElementById('status');
             statusEl.style.color = '#333';
@@ -430,7 +435,7 @@
                 temperature,
                 max_tokens,
                 max_iterations,
-                review_prompt,
+                evaluation_criteria,
                 iterate_until_satisfied: document.getElementById('iterate_until_satisfied').checked
             });
         });
