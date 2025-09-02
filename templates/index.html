@@ -110,6 +110,15 @@
         <button type="submit">Refine Prompt</button>
     </form>
 
+    <!-- Last Session Results -->
+    <div id="last-session" style="margin-top: 2em; display: none;">
+        <h3 style="color: #1565c0;">📊 Last Session Results</h3>
+        <div style="background: #f8f9fa; padding: 1em; border-radius: 4px; border: 1px solid #e9ecef;">
+            <div id="last-session-content"></div>
+        </div>
+        <button onclick="loadLastSession()" style="margin-top: 0.5em; background: #1976d2; color: white; border: none; padding: 0.5em 1em; border-radius: 4px; cursor: pointer;">🔄 Load Last Session</button>
+    </div>
+
     <div id="status" aria-live="polite" style="margin-top: 1em;"></div>
     <div id="progress-log" style="margin-top: 1em; background: #f5f5f5; padding: 1em; border-radius: 4px; max-height: 300px; overflow-y: auto; display: none;">
         <h4>Progress Log:</h4>
@@ -122,8 +131,9 @@
         <!-- Tab Navigation -->
         <div style="border-bottom: 2px solid #e0e0e0; margin-bottom: 1em;">
             <button class="tab-button active" onclick="showTab('final-tab', this)" style="background: none; border: none; padding: 0.8em 1.5em; cursor: pointer; font-weight: bold; border-bottom: 3px solid #1976d2;">📄 Final Result</button>
+            <button class="tab-button" onclick="showTab('scores-tab', this)" style="background: none; border: none; padding: 0.8em 1.5em; cursor: pointer; font-weight: bold; border-bottom: 3px solid transparent;">📊 LLM Scores</button>
             <button class="tab-button" onclick="showTab('comparison-tab', this)" style="background: none; border: none; padding: 0.8em 1.5em; cursor: pointer; font-weight: bold; border-bottom: 3px solid transparent;">🔍 What Changed</button>
-            <button class="tab-button" onclick="showTab('history-tab', this)" style="background: none; border: none; padding: 0.8em 1.5em; cursor: pointer; font-weight: bold; border-bottom: 3px solid transparent;">📊 Full History</button>
+            <button class="tab-button" onclick="showTab('history-tab', this)" style="background: none; border: none; padding: 0.8em 1.5em; cursor: pointer; font-weight: bold; border-bottom: 3px solid transparent;">� Full History</button>
         </div>
         
         <!-- Final Result Tab -->
@@ -133,6 +143,16 @@
         </div>
         
         <!-- Comparison Tab -->
+                
+        <!-- LLM Scores Tab -->
+        <div id="scores-tab" class="tab-content" style="display: none;">
+            <h4 style="color: #1b5e20;">📊 LLM Evaluation Scores:</h4>
+            <div id="scoresContent">
+                <p style="color: #666; font-style: italic;">No scoring data available for current session</p>
+            </div>
+        </div>
+        
+        <!-- What Changed Tab -->
         <div id="comparison-tab" class="tab-content" style="display: none;">
             <h4 style="color: #1b5e20;">🔍 Original vs Refined Comparison:</h4>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1em; margin-bottom: 1em;">
@@ -155,6 +175,22 @@
         <div id="history-tab" class="tab-content" style="display: none;">
             <h4 style="color: #1b5e20;">📊 Detailed Refinement History:</h4>
             <div id="history" style="margin-top: 1em;"></div>
+        </div>
+    </div>
+
+    <!-- Session Results Section -->
+    <div id="sessionResults" style="margin-top: 2em; padding: 1em; border-radius: 8px; background-color: #f8f9fa; border: 1px solid #e0e0e0; display: none;">
+        <h3 style="color: #1976d2; margin-bottom: 1em;">💾 Last Session Results</h3>
+        <div style="display: flex; gap: 1em; margin-bottom: 1em;">
+            <button onclick="loadLastSession()" style="padding: 0.6em 1.2em; background-color: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                🔄 Load Last Session
+            </button>
+            <button onclick="clearSessionData()" style="padding: 0.6em 1.2em; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                🗑️ Clear Session Data
+            </button>
+        </div>
+        <div id="sessionContent">
+            <p style="color: #666; font-style: italic;">No session data available</p>
         </div>
     </div>
 
@@ -394,6 +430,12 @@
             if (data.saved_file) {
                 addLogEntry(`💾 Saved to file: ${data.saved_file}`, '💾');
             }
+
+            // Display LLM scores if available
+            if (data.final_scores) {
+                document.getElementById('scoresContent').innerHTML = displayLLMScores(data.final_scores);
+                addLogEntry('📊 LLM evaluation scores calculated', '📊');
+            }
             
             // Scroll to results
             document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
@@ -438,6 +480,165 @@
                 evaluation_criteria,
                 iterate_until_satisfied: document.getElementById('iterate_until_satisfied').checked
             });
+        });
+
+        // Session Management Functions
+        function loadLastSession() {
+            console.log('Loading last session...');
+            fetch('/api/last-session')
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Session data received:', data);
+                    if (data.error) {
+                        document.getElementById('sessionContent').innerHTML = 
+                            `<p style="color: #d32f2f;">❌ Error: ${data.error}</p>`;
+                        return;
+                    }
+                    
+                    displaySessionResults(data);
+                    document.getElementById('sessionResults').style.display = 'block';
+                })
+                .catch(error => {
+                    console.error('Error loading session:', error);
+                    document.getElementById('sessionContent').innerHTML = 
+                        `<p style="color: #d32f2f;">❌ Failed to load session data</p>`;
+                });
+        }
+
+        function displaySessionResults(sessionData) {
+            console.log('Displaying session results:', sessionData);
+            const content = document.getElementById('sessionContent');
+            let html = '';
+            
+            if (sessionData.timestamp) {
+                html += `<p><strong>Session:</strong> ${new Date(sessionData.timestamp).toLocaleString()}</p>`;
+            }
+            
+            if (sessionData.model) {
+                html += `<p><strong>Model:</strong> ${sessionData.model}</p>`;
+            }
+            
+            if (sessionData.iterations_completed !== undefined) {
+                html += `<p><strong>Iterations:</strong> ${sessionData.iterations_completed}</p>`;
+            }
+            
+            if (sessionData.total_tokens !== undefined) {
+                html += `<p><strong>Total Tokens:</strong> ${sessionData.total_tokens.toLocaleString()}</p>`;
+            }
+
+            if (sessionData.refined_prompt || sessionData.final_prompt) {
+                const finalPrompt = sessionData.final_prompt || sessionData.refined_prompt;
+                html += `
+                    <div style="margin: 1em 0;">
+                        <h5 style="color: #1b5e20;">🎯 Final Refined Prompt:</h5>
+                        <div style="background: #f0f8ff; padding: 1em; border-radius: 4px; border-left: 4px solid #1976d2; font-family: monospace; white-space: pre-wrap; max-height: 300px; overflow-y: auto;">
+                            ${finalPrompt}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            if (sessionData.final_scores) {
+                console.log('Adding scores to display:', sessionData.final_scores);
+                html += displayLLMScores(sessionData.final_scores);
+            }
+            
+            content.innerHTML = html;
+            
+            // Also populate the scores tab if scores exist
+            if (sessionData.final_scores) {
+                document.getElementById('scoresContent').innerHTML = displayLLMScores(sessionData.final_scores);
+            }
+        }
+
+        function displayLLMScores(scores) {
+            console.log('displayLLMScores called with:', scores);
+            if (!scores || typeof scores !== 'object') {
+                console.log('No valid scores provided');
+                return '';
+            }
+            
+            let html = `
+                <div style="margin: 1em 0;">
+                    <h5 style="color: #1976d2;">📊 LLM Evaluation Scores:</h5>
+                    <div style="background: #fff; padding: 1em; border-radius: 8px; border: 1px solid #e0e0e0;">
+            `;
+            
+            const scoreLabels = {
+                'content_accuracy': 'Content Accuracy',
+                'completeness': 'Completeness', 
+                'audio_clarity': 'Audio Clarity',
+                'pharma_compliance': 'Pharma Compliance',
+                'refinement_quality': 'Refinement Quality',
+                'diminishing_returns': 'Diminishing Returns',
+                'directional_correctness': 'Directional Correctness',
+                'overall_readiness': 'Overall Readiness'
+            };
+            
+            Object.entries(scores).forEach(([key, value]) => {
+                if (scoreLabels[key] && typeof value === 'number') {
+                    const percentage = (value / 10) * 100;
+                    const color = getScoreColor(value);
+                    
+                    html += `
+                        <div style="margin: 0.8em 0;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3em;">
+                                <span style="font-weight: bold;">${scoreLabels[key]}</span>
+                                <span style="color: ${color}; font-weight: bold;">${value.toFixed(1)}/10</span>
+                            </div>
+                            <div style="background: #f0f0f0; border-radius: 10px; height: 20px; overflow: hidden;">
+                                <div style="background: linear-gradient(90deg, ${color}, ${color}aa); width: ${percentage}%; height: 100%; transition: width 0.3s ease;"></div>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+            
+            html += `</div></div>`;
+            return html;
+        }
+
+        function getScoreColor(score) {
+            if (score >= 8) return '#2e7d32';      // Green
+            if (score >= 6) return '#f57c00';      // Orange  
+            if (score >= 4) return '#ef6c00';      // Dark orange
+            return '#d32f2f';                      // Red
+        }
+
+        function clearSessionData() {
+            document.getElementById('sessionContent').innerHTML = 
+                '<p style="color: #666; font-style: italic;">No session data available</p>';
+            document.getElementById('scoresContent').innerHTML = 
+                '<p style="color: #666; font-style: italic;">No scoring data available for current session</p>';
+            document.getElementById('sessionResults').style.display = 'none';
+        }
+
+        // Check for existing session data on page load
+        window.addEventListener('load', function() {
+            fetch('/api/last-session')
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.error && data.timestamp) {
+                        // Show a subtle notification that session data is available
+                        const sessionDiv = document.getElementById('sessionResults');
+                        sessionDiv.style.display = 'block';
+                        sessionDiv.style.border = '2px solid #1976d2';
+                        sessionDiv.innerHTML = `
+                            <h3 style="color: #1976d2; margin-bottom: 1em;">💾 Session Data Available</h3>
+                            <p style="margin: 0.5em 0;">Found results from: <strong>${new Date(data.timestamp).toLocaleString()}</strong></p>
+                            <button onclick="loadLastSession()" style="padding: 0.6em 1.2em; background-color: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-right: 1em;">
+                                🔄 Load Results
+                            </button>
+                            <button onclick="this.parentElement.style.display='none'" style="padding: 0.6em 1.2em; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                Dismiss
+                            </button>
+                        `;
+                    }
+                })
+                .catch(error => console.log('No previous session found'));
         });
     </script>
 </body>
