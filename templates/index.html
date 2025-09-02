@@ -99,8 +99,13 @@
         <small style="color: #666; display: block; margin-left: 1.2em; margin-top: 0.2em;">⚠️ This may result in many iterations and higher costs</small>
         <br>
 
-        <label for="review_prompt">Custom Review Prompt (optional):</label>
-        <textarea id="review_prompt" name="review_prompt" placeholder="Provide your own review checklist/prompt. If blank, the app will generate one."></textarea><br>
+        <label for="review_prompt">Review Prompt (prompt_refinement.md loaded as default):</label>
+        {% if has_default_review_prompt %}
+        <small style="color: #28a745; margin-bottom: 0.5em; display: block;">📋 Default pharma/audio expert review prompt from prompt_refinement.md is automatically loaded. You can modify or replace this content.</small>
+        {% else %}
+        <small style="color: #dc3545; margin-bottom: 0.5em; display: block;">⚠️ prompt_refinement.md not found - please provide your review criteria or leave blank for automatic generation.</small>
+        {% endif %}
+        <textarea id="review_prompt" name="review_prompt">{{ default_review_prompt }}</textarea><br>
 
         <button type="submit">Refine Prompt</button>
     </form>

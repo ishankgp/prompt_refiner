@@ -1,11 +1,10 @@
 import os
 import logging
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template
 from flask_socketio import SocketIO, emit
 from openai import OpenAI
 from dotenv import load_dotenv
 import json
-import time
 from datetime import datetime
 
 load_dotenv()
@@ -23,6 +22,169 @@ def load_default_attachment():
     except Exception as e:
         logger.error(f"Error loading webpage.txt: {e}")
         return ""
+
+def load_default_review_prompt():
+    """Load the default review prompt from prompt_refinement.md"""
+    try:
+        with open('prompt_refinement.md', 'r', encoding='utf-8') as f:
+            content = f.read()
+        logger.info("Default review prompt (prompt_refinement.md) loaded successfully")
+        return content
+    except FileNotFoundError:
+        logger.warning("prompt_refinement.md not found, will use fallback review prompt")
+        return ""
+    except Exception as e:
+        logger.error(f"Error loading prompt_refinement.md: {e}")
+        return ""
+
+def llm_score_refinement(current_prompt, critique, refinement_history, attachments, model, client):
+    """
+    Use LLM to score the current refinement iteration across multiple dimensions
+    Returns satisfaction decision and scoring details
+    """
+    
+    # Calculate score deltas from history
+    previous_scores = []
+    if len(refinement_history) >= 2:
+        for item in refinement_history[-3:]:  # Look at last 3 iterations
+            if 'llm_scores' in item:
+                previous_scores.append(item['llm_scores'].get('overall_readiness', 0))
+    
+    delta_context = ""
+    if previous_scores:
+        delta_context = f"\nRECENT READINESS SCORES: {previous_scores} (look for diminishing improvements)"
+    
+    scoring_prompt = f"""
+You are evaluating a prompt refinement iteration. Analyze the current state and provide structured scoring.
+
+SOURCE CONTENT (for reference):
+{get_smart_content_limit(model, attachments, "scoring") if attachments else "No source content provided"}
+
+CURRENT PROMPT BEING EVALUATED:
+{current_prompt}
+
+LATEST REFINEMENT CRITIQUE:
+{critique}
+
+REFINEMENT HISTORY: {len(refinement_history)} iterations completed{delta_context}
+
+Your task: Score this refinement on a 0-10 scale across these dimensions:
+
+1. CONTENT_ACCURACY (0-10): How well does the prompt reflect source content? Any factual errors or hallucinations?
+2. COMPLETENESS (0-10): Covers all essential elements? Missing critical pharma details?
+3. AUDIO_CLARITY (0-10): Professional tone, clear signposting, proper audio flow for HCP listeners?
+4. PHARMA_COMPLIANCE (0-10): Appropriate for healthcare professionals? Regulatory considerations?
+5. REFINEMENT_QUALITY (0-10): How effective was the latest refinement iteration?
+6. DIMINISHING_RETURNS (0-10): Are recent changes becoming minimal? (10 = very small improvements)
+
+Strategic Assessment:
+7. DIRECTIONAL_CORRECTNESS (0-10): Is the refinement approach heading in the right direction?
+8. OVERALL_READINESS (0-10): Ready for production use by healthcare professionals?
+
+Decision Points:
+- STOP_REFINEMENT: YES/NO (should we stop refining?)
+- CHANGE_APPROACH: YES/NO (should we try a different refinement strategy?)
+- CONFIDENCE: 0-10 (how confident are you in this assessment?)
+
+Respond in EXACTLY this format:
+CONTENT_ACCURACY: [score]
+COMPLETENESS: [score]
+AUDIO_CLARITY: [score]  
+PHARMA_COMPLIANCE: [score]
+REFINEMENT_QUALITY: [score]
+DIMINISHING_RETURNS: [score]
+DIRECTIONAL_CORRECTNESS: [score]
+OVERALL_READINESS: [score]
+STOP_REFINEMENT: [YES/NO]
+CHANGE_APPROACH: [YES/NO]
+CONFIDENCE: [score]
+REASONING: [2-3 sentences explaining the key factors in your decision]
+"""
+
+    try:
+        api_params = get_model_params(model, 0.3, 1500)  # Low temperature for consistent scoring
+        
+        response = client.chat.completions.create(
+            messages=[{"role": "user", "content": scoring_prompt}],
+            **api_params
+        )
+        
+        evaluation_text = response.choices[0].message.content
+        return parse_llm_scores(evaluation_text, previous_scores)
+        
+    except Exception as e:
+        logger.error(f"Error in LLM scoring: {e}")
+        # Fallback to simple satisfaction check
+        return {
+            'satisfied': "SATISFIED" in critique.upper(),
+            'scores': {},
+            'stop_refinement': False,
+            'change_approach': False,
+            'reasoning': f"LLM scoring failed: {e}, used fallback",
+            'confidence': 5.0
+        }
+
+def parse_llm_scores(evaluation_text, previous_scores):
+    """Parse structured LLM evaluation response"""
+    scores = {}
+    lines = evaluation_text.strip().split('\n')
+    
+    score_fields = [
+        'CONTENT_ACCURACY', 'COMPLETENESS', 'AUDIO_CLARITY', 'PHARMA_COMPLIANCE',
+        'REFINEMENT_QUALITY', 'DIMINISHING_RETURNS', 'DIRECTIONAL_CORRECTNESS', 
+        'OVERALL_READINESS', 'CONFIDENCE'
+    ]
+    
+    for line in lines:
+        if ':' in line:
+            key, value = line.split(':', 1)
+            key = key.strip().upper()
+            value = value.strip()
+            
+            if key in score_fields:
+                try:
+                    scores[key.lower()] = float(value)
+                except:
+                    scores[key.lower()] = 0.0
+            elif key == 'STOP_REFINEMENT':
+                scores['stop_refinement'] = value.upper() in ['YES', 'TRUE']
+            elif key == 'CHANGE_APPROACH':
+                scores['change_approach'] = value.upper() in ['YES', 'TRUE']
+            elif key == 'REASONING':
+                scores['reasoning'] = value
+    
+    # Calculate satisfaction based on multiple criteria
+    overall_readiness = scores.get('overall_readiness', 0)
+    confidence = scores.get('confidence', 0)
+    diminishing_returns = scores.get('diminishing_returns', 0)
+    directional_correctness = scores.get('directional_correctness', 0)
+    
+    # Check for score improvement stagnation
+    improvement_stagnant = False
+    if previous_scores and len(previous_scores) >= 2:
+        recent_improvements = [previous_scores[i] - previous_scores[i-1] for i in range(1, len(previous_scores))]
+        if all(improvement < 0.5 for improvement in recent_improvements):
+            improvement_stagnant = True
+    
+    # Sophisticated satisfaction logic
+    is_satisfied = (
+        scores.get('stop_refinement', False) or
+        (overall_readiness >= 8.5 and confidence >= 7.0) or
+        (overall_readiness >= 7.5 and diminishing_returns >= 8.0) or
+        (improvement_stagnant and overall_readiness >= 7.0) or
+        (directional_correctness < 6.0 and scores.get('change_approach', False))
+    )
+    
+    return {
+        'satisfied': is_satisfied,
+        'scores': scores,
+        'stop_refinement': scores.get('stop_refinement', False),
+        'change_approach': scores.get('change_approach', False),
+        'reasoning': scores.get('reasoning', 'No reasoning provided'),
+        'confidence': confidence,
+        'overall_readiness': overall_readiness,
+        'improvement_stagnant': improvement_stagnant
+    }
 
 # Setup logging
 def setup_logging():
@@ -53,13 +215,71 @@ def setup_logging():
 
 logger = setup_logging()
 
+def get_model_params(model, temperature, max_tokens):
+    """Get appropriate parameters for different OpenAI models"""
+    # GPT-5 and newer models use max_completion_tokens instead of max_tokens
+    if model.startswith('gpt-5'):
+        return {
+            "model": model,
+            "temperature": temperature,
+            "max_completion_tokens": max_tokens
+        }
+    else:
+        return {
+            "model": model,
+            "temperature": temperature,
+            "max_tokens": max_tokens
+        }
+
+def get_smart_content_limit(model, attachments, task_type="general"):
+    """
+    Intelligently determine how much content to include based on model capabilities
+    and task requirements
+    """
+    # Model context limits (in characters, roughly 4 chars per token)
+    model_limits = {
+        'gpt-5': 500000,      # ~125k tokens
+        'gpt-4o': 500000,     # ~125k tokens  
+        'gpt-4o-mini': 500000, # ~125k tokens
+        'gpt-4-turbo': 500000, # ~125k tokens
+        'gpt-4': 30000,       # ~8k tokens
+        'gpt-3.5-turbo': 60000, # ~16k tokens
+        'o1-preview': 500000,
+        'o1-mini': 500000
+    }
+    
+    # Reserve space for prompt structure, response, etc.
+    overhead_chars = {
+        'critique': 8000,     # Room for prompt structure + response
+        'refinement': 12000,  # More room for detailed refinement 
+        'scoring': 6000,      # Less room needed for scoring
+        'general': 10000
+    }
+    
+    base_limit = model_limits.get(model, 30000)  # Default to conservative limit
+    overhead = overhead_chars.get(task_type, 10000)
+    available_chars = base_limit - overhead
+    
+    if len(attachments) <= available_chars:
+        logger.info(f"Using full attachment content ({len(attachments)} chars) for {task_type}")
+        return attachments
+    else:
+        logger.warning(f"Truncating attachment from {len(attachments)} to {available_chars} chars for {model}/{task_type}")
+        return attachments[:available_chars]
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'prompt_refiner_secret_key'
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-client = OpenAI(
-    api_key=os.environ.get("OPENAI_API_KEY"),
-)
+# Initialize OpenAI client with error handling
+try:
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+    if not os.environ.get("OPENAI_API_KEY"):
+        logger.error("OPENAI_API_KEY not found in environment variables")
+        client = None
+except Exception as e:
+    logger.error(f"Failed to initialize OpenAI client: {e}")
+    client = None
 
 def save_refined_prompt(original_prompt, refined_prompt, history, metadata, logs=None):
     """Save the refined prompt to a file with timestamp"""
@@ -94,7 +314,11 @@ def save_refined_prompt(original_prompt, refined_prompt, history, metadata, logs
 @app.route('/')
 def index():
     default_attachment = load_default_attachment()
-    return render_template('index.html', default_attachment=default_attachment)
+    default_review_prompt = load_default_review_prompt()
+    return render_template('index.html', 
+                         default_attachment=default_attachment,
+                         default_review_prompt=default_review_prompt,
+                         has_default_review_prompt=bool(default_review_prompt))
 
 @socketio.on('connect')
 def handle_connect():
@@ -133,6 +357,10 @@ def handle_refinement(data):
     
     log_and_emit("Starting refinement process via WebSocket", '🚀')
     
+    if not client:
+        log_and_emit('OpenAI client not initialized. Check OPENAI_API_KEY in .env file.', '❌', 'error')
+        return
+    
     if not os.environ.get("OPENAI_API_KEY"):
         log_and_emit('Missing OPENAI_API_KEY. Set it in your .env file.', '❌', 'error')
         return
@@ -170,28 +398,32 @@ def handle_refinement(data):
     
     review_prompt_override = (data.get('review_prompt') or '').strip()
     
-    if not initial_prompt:
-        log_and_emit('Prompt is required', '❌', 'error')
+    if not initial_prompt or not initial_prompt.strip():
+        log_and_emit('Prompt is required and cannot be empty', '❌', 'error')
         return
         
+    # Sanitize inputs
+    initial_prompt = initial_prompt.strip()
+    attachments = (attachments or "").strip()
+    
     current_prompt = initial_prompt
     history = []
     iterations_done = 0
     satisfied = False
-
-    for i in range(max_iterations):
-        iteration_num = i + 1
-        if iterate_until_satisfied:
-            log_and_emit(f"Starting iteration {iteration_num} (iterating until satisfied)", '🔄')
-        else:
-            log_and_emit(f"Starting iteration {iteration_num}/{max_iterations}", '🔄')
+    
+    # Load review prompt ONCE at the beginning (not in every iteration)
+    if review_prompt_override:
+        log_and_emit("Using your custom review prompt", '📋')
+        review_prompt = review_prompt_override
+    else:
+        log_and_emit("Loading default pharma/audio expert review prompt...", '🎯')
+        default_review = load_default_review_prompt()
         
-        # 1. Get review prompt
-        if review_prompt_override:
-            log_and_emit("Using your custom review prompt", '📋')
-            review_prompt = review_prompt_override
+        if default_review:
+            review_prompt = default_review
+            log_and_emit("Using prompt_refinement.md as review criteria", '📋')
         else:
-            log_and_emit("Generating review criteria...", '🎯')
+            log_and_emit("Generating fallback review criteria...", '🎯')
             
             review_prompt_generation = f"""
             Given the following user prompt, generate a concise "review prompt" to critique and identify gaps in the prompt.
@@ -201,21 +433,20 @@ def handle_refinement(data):
             "{current_prompt}"
 
             Attachments:
-            "{attachments}"
+            "{get_smart_content_limit(model, attachments, "general") if attachments else "No attachments provided"}"
 
             Output only the review prompt text, no preface or explanation.
             """
 
             try:
                 log_and_emit("Calling OpenAI API for review criteria...", '💬')
+                api_params = get_model_params(model, temperature, max_tokens)
                 response = client.chat.completions.create(
-                    model=model,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
                     messages=[
                         {"role": "system", "content": "You are a precise assistant that crafts prompt review checklists."},
                         {"role": "user", "content": review_prompt_generation}
-                    ]
+                    ],
+                    **api_params
                 )
                 review_prompt = response.choices[0].message.content.strip()
                 log_and_emit(f"Review criteria generated: {review_prompt[:100]}...", '✅')
@@ -223,102 +454,147 @@ def handle_refinement(data):
                 log_and_emit(f"Error generating review prompt: {e}", '❌', 'error')
                 return
 
-        # 2. Critique
-        log_and_emit("Analyzing current prompt...", '🔍')
+    for i in range(max_iterations):
+        iteration_num = i + 1
+        if iterate_until_satisfied:
+            log_and_emit(f"Starting iteration {iteration_num} (iterating until satisfied)", '🔄')
+        else:
+            log_and_emit(f"Starting iteration {iteration_num}/{max_iterations}", '🔄')
+        
+        # 1. Critique and LLM Scoring (review_prompt already loaded)
+        log_and_emit("Analyzing current prompt with LLM scoring...", '🔍')
         
         critique_prompt = f"""
-        Using the following review prompt, critique the user's prompt and list concrete improvements.
-        If no improvements are necessary, respond with a single line containing exactly: SATISFIED
+        You are evaluating a SET OF INSTRUCTIONS (a prompt) that tells someone how to create content, NOT evaluating the content itself.
 
-        Review Prompt:
-        "{review_prompt}"
+        REVIEW CRITERIA:
+        {review_prompt}
 
-        Initial Prompt:
-        "{current_prompt}"
+        INSTRUCTIONS/PROMPT TO EVALUATE:
+        {current_prompt}
 
-        Attachments:
-        "{attachments}"
+        SOURCE CONTENT FOR CONTEXT:
+        {get_smart_content_limit(model, attachments, "critique") if attachments else "No attachments provided"}
 
-        Provide the critique:
+        Your task: Critique these INSTRUCTIONS. Are they clear enough? Do they specify what content should be included? Are there missing requirements? Do they provide enough guidance for someone to follow them effectively?
+
+        Focus your critique on the quality and completeness of the INSTRUCTIONS themselves, not on any content that might be created by following those instructions.
+
+        Provide detailed critique and specific suggestions for improving the INSTRUCTIONS:
         """
 
         try:
-            log_and_emit("Calling OpenAI API for analysis...", '💬')
+            log_and_emit("Calling OpenAI API for critique analysis...", '💬')
+            api_params = get_model_params(model, temperature, max_tokens)
             response = client.chat.completions.create(
-                model=model,
-                temperature=temperature,
-                max_tokens=max_tokens,
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant that critiques prompts."},
+                    {"role": "system", "content": "You are a pharma and audio narration expert providing detailed critiques."},
                     {"role": "user", "content": critique_prompt}
-                ]
+                ],
+                **api_params
             )
             critique = response.choices[0].message.content.strip()
-            log_and_emit(f"Analysis complete: {critique[:100]}...", '✅')
+            log_and_emit(f"Critique generated: {critique[:100]}...", '✅')
         except Exception as e:
             log_and_emit(f"Error generating critique: {e}", '❌', 'error')
             return
 
-        history.append({
+        # LLM-based satisfaction scoring
+        log_and_emit("🧠 Evaluating satisfaction with LLM scoring...", '🎯')
+        
+        satisfaction_result = llm_score_refinement(
+            current_prompt, critique, history, attachments, model, client
+        )
+        
+        # Store LLM scores in history
+        history_item = {
             'prompt': current_prompt,
             'review_prompt': review_prompt,
-            'critique': critique
-        })
+            'critique': critique,
+            'llm_scores': satisfaction_result['scores'],
+            'iteration': iteration_num
+        }
+        history.append(history_item)
 
-        iterations_done = i + 1
-        if 'SATISFIED' in critique:
-            satisfied = True
-            log_and_emit("Prompt is now satisfactory!", '🎉')
+        # Display scoring results
+        scores = satisfaction_result['scores']
+        log_and_emit(f"📊 Overall Readiness: {satisfaction_result['overall_readiness']:.1f}/10 | Confidence: {satisfaction_result['confidence']:.1f}/10", '�')
+        log_and_emit(f"📈 Content: {scores.get('content_accuracy', 0):.1f} | Complete: {scores.get('completeness', 0):.1f} | Audio: {scores.get('audio_clarity', 0):.1f} | Pharma: {scores.get('pharma_compliance', 0):.1f}", '📊')
+        
+        # Check for approach change recommendation
+        if satisfaction_result['change_approach']:
+            log_and_emit("🔄 LLM recommends changing refinement approach", '⚠️')
+            log_and_emit(f"💡 Reasoning: {satisfaction_result['reasoning']}", '🧠')
             break
-        elif iterate_until_satisfied and i == max_iterations - 1:
+            
+        # Satisfaction decision
+        iterations_done = iteration_num
+        if satisfaction_result['satisfied']:
+            if satisfaction_result['stop_refinement']:
+                log_and_emit("✅ LLM recommends stopping - quality criteria met!", '🎉')
+            elif satisfaction_result['improvement_stagnant']:
+                log_and_emit("🎯 Improvement stagnation detected - stopping refinement", '📈')
+            else:
+                log_and_emit("⭐ High quality threshold achieved!", '🎉')
+            
+            log_and_emit(f"💡 Final reasoning: {satisfaction_result['reasoning']}", '🧠')
+            satisfied = True
+            break
+        elif iterate_until_satisfied and iteration_num == max_iterations:
             log_and_emit(f"Reached safety limit ({max_iterations} iterations) while iterating until satisfied", '⚠️')
         elif not iterate_until_satisfied and i == max_iterations - 1:
             # This will be the last iteration for fixed max_iterations mode
             pass
 
-        # 3. Refine
-        log_and_emit("Refining prompt based on feedback...", '🔧')
+        # 3. Refine prompt based on critique
+        log_and_emit("Refining prompt based on LLM feedback...", '🔧')
         
         refinement_prompt = f"""
-        Refine the user's prompt based on the critique below. Keep the intent but improve clarity, specificity, constraints, and output formatting.
-        Return only the refined prompt, no commentary.
+        You are a prompt engineering expert. Your task is to REFINE THE INSTRUCTIONS/PROMPT below, NOT to execute them.
 
-        Critique:
-        "{critique}"
+        The user has provided a PROMPT (set of instructions) that needs improvement. You must refine these INSTRUCTIONS to make them clearer and more effective, but DO NOT execute the instructions to create content.
 
-        Initial Prompt:
-        "{current_prompt}"
+        CRITIQUE AND FEEDBACK TO ADDRESS:
+        {critique}
 
-        Attachments:
-        "{attachments}"
+        CURRENT PROMPT INSTRUCTIONS TO REFINE:
+        {current_prompt}
 
-        Refined Prompt:
+        CONTEXT FOR UNDERSTANDING THE PROMPT:
+        {get_smart_content_limit(model, attachments, "refinement") if attachments else "No source content provided"}
+
+        YOUR TASK: Improve the PROMPT INSTRUCTIONS above based on the critique. Make the instructions clearer, more specific, and more complete. Return ONLY the improved prompt instructions, not any content created by following those instructions.
+
+        REFINED PROMPT INSTRUCTIONS:
         """
 
         try:
-            log_and_emit("Calling OpenAI API for refinement...", '💬')
+            log_and_emit("Calling OpenAI API for prompt refinement...", '💬')
+            api_params = get_model_params(model, temperature, max_tokens)
             response = client.chat.completions.create(
-                model=model,
-                temperature=temperature,
-                max_tokens=max_tokens,
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant that refines prompts."},
+                    {"role": "system", "content": "You are an expert at refining prompt instructions. You improve the INSTRUCTIONS themselves, you do not execute the instructions to create content. Always return improved instructions/prompts, never the content those instructions would generate."},
                     {"role": "user", "content": refinement_prompt}
-                ]
+                ],
+                **api_params
             )
             current_prompt = response.choices[0].message.content.strip()
-            log_and_emit(f"Iteration {iteration_num} complete", '✨')
+            log_and_emit(f"Iteration {iteration_num} refinement complete", '✨')
         except Exception as e:
             log_and_emit(f"Error refining prompt: {e}", '❌', 'error')
             return
 
+    # Final result processing
     if not satisfied:
         if iterate_until_satisfied:
             log_and_emit(f"Reached safety limit ({max_iterations} iterations) without satisfaction", '⏹️')
         else:
             log_and_emit(f"Reached max iterations ({max_iterations})", '⏹️')
 
-    # Save to file
+    log_and_emit(f"🏁 Refinement complete! Total iterations: {iterations_done}", '🎯')
+
+    # Enhanced metadata with LLM scoring results
+    final_scores = history[-1].get('llm_scores', {}) if history else {}
     metadata = {
         'model': model,
         'temperature': temperature,
@@ -326,7 +602,11 @@ def handle_refinement(data):
         'iterations': iterations_done,
         'satisfied': satisfied,
         'iterate_until_satisfied': iterate_until_satisfied,
-        'session_id': session_id
+        'session_id': session_id,
+        'final_scores': final_scores,
+        'final_readiness': final_scores.get('overall_readiness', 0),
+        'final_confidence': final_scores.get('confidence', 0),
+        'used_default_review_prompt': not bool(review_prompt_override)
     }
     
     filename = save_refined_prompt(initial_prompt, current_prompt, history, metadata, session_logs)
