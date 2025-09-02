@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prompt Refiner</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 2em;
+        }
+        textarea {
+            width: 100%;
+            height: 150px;
+            margin-bottom: 1em;
+        }
+    .result {
+            margin-top: 2em;
+            border: 1px solid #ccc;
+            padding: 1em;
+        }
+        .result h3 {
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Prompt Refiner</h1>
+    <form id="refine-form">
+        <label for="prompt">Initial Prompt:</label><br>
+        <textarea id="prompt" name="prompt" required></textarea><br>
+        <label for="attachments">Attachments (optional):</label><br>
+        <textarea id="attachments" name="attachments"></textarea><br>
+
+        <h3>Parameters</h3>
+        <label for="model">Model:</label>
+        <select id="model" name="model">
+            <option value="gpt-4o" selected>gpt-4o</option>
+            <option value="gpt-4o-mini">gpt-4o-mini (cost-effective)</option>
+            <option value="gpt-4-turbo">gpt-4-turbo</option>
+            <option value="gpt-4">gpt-4</option>
+            <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+        </select>
+        <br>
+        <label for="temperature">Temperature:</label>
+        <input type="range" id="temperature" name="temperature" min="0" max="2" step="0.1" value="1">
+        <span id="temperature-value">1.0</span>
+        <br>
+        <label for="max_tokens">Max Tokens:</label>
+        <input type="number" id="max_tokens" name="max_tokens" value="6000">
+        <br>
+        <label for="max_iterations">Max Iterations:</label>
+        <input type="number" id="max_iterations" name="max_iterations" value="5" min="1" max="10">
+        <br>
+
+        <label for="review_prompt">Custom Review Prompt (optional):</label>
+        <textarea id="review_prompt" name="review_prompt" placeholder="Provide your own review checklist/prompt. If blank, the app will generate one."></textarea><br>
+
+        <button type="submit">Refine Prompt</button>
+    </form>
+
+    <div id="status" aria-live="polite" style="margin-top: 1em;"></div>
+    <div id="progress-log" style="margin-top: 1em; background: #f5f5f5; padding: 1em; border-radius: 4px; max-height: 300px; overflow-y: auto; display: none;">
+        <h4>Progress Log:</h4>
+        <div id="log-content"></div>
+    </div>
+
+    <div id="results" class="result" style="display:none;">
+        <h3 style="color: #1b5e20;">🎯 Final Refined Prompt:</h3>
+        <div id="refined-prompt" style="background: #f0f8ff; padding: 1em; border-radius: 4px; border-left: 4px solid #1976d2; margin-bottom: 1em; font-family: monospace; white-space: pre-wrap;"></div>
+        
+        <details style="margin-top: 2em;">
+            <summary style="cursor: pointer; font-weight: bold; color: #333;">📊 View Refinement History</summary>
+            <div id="history" style="margin-top: 1em;"></div>
+        </details>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        document.getElementById('temperature').addEventListener('input', function(event) {
+            document.getElementById('temperature-value').textContent = event.target.value;
+        });
+
+        const form = document.getElementById('refine-form');
+        let socket = null;
+        
+        function initializeSocket() {
+            if (socket) return socket;
+            socket = io();
+            
+            socket.on('progress', function(data) {
+                const statusEl = document.getElementById('status');
+                statusEl.style.color = '#333';
+                statusEl.innerHTML = `⏳ ${data.message}`;
+                addLogEntry(data.message, data.emoji || '📝');
+            });
+            
+            socket.on('error', function(data) {
+                const statusEl = document.getElementById('status');
+                statusEl.style.color = '#b00020';
+                statusEl.textContent = 'Error: ' + data.message;
+                addLogEntry('❌ ' + data.message, '❌');
+                resetForm();
+            });
+            
+            socket.on('complete', function(data) {
+                handleComplete(data);
+                resetForm();
+            });
+            
+            return socket;
+        }
+        
+        function resetForm() {
+            const submitBtn = form.querySelector('button[type="submit"]');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Refine Prompt';
+        }
+        
+        function addLogEntry(message, emoji = '📝') {
+            const logContent = document.getElementById('log-content');
+            const entry = document.createElement('div');
+            entry.style.marginBottom = '0.5em';
+            entry.innerHTML = `${emoji} ${message}`;
+            logContent.appendChild(entry);
+            logContent.scrollTop = logContent.scrollHeight;
+        }
+        
+        function handleComplete(data) {
+            addLogEntry(`✅ Processing complete! Generated ${data.iterations} iteration(s)`, '🎉');
+            
+            const escapeHtml = (unsafe) => {
+                return unsafe
+                    .replaceAll('&', '&amp;')
+                    .replaceAll('<', '&lt;')
+                    .replaceAll('>', '&gt;');
+            };
+            
+            // Show the refined prompt prominently
+            const refinedPromptEl = document.getElementById('refined-prompt');
+            refinedPromptEl.textContent = data.refined_prompt;
+            
+            // Show history
+            const historyDiv = document.getElementById('history');
+            historyDiv.innerHTML = '';
+
+            // Show each iteration
+            data.history.forEach((item, index) => {
+                const iterationDiv = document.createElement('div');
+                iterationDiv.style.borderBottom = '1px solid #eee';
+                iterationDiv.style.paddingBottom = '1em';
+                iterationDiv.style.marginBottom = '1em';
+                iterationDiv.style.backgroundColor = '#fafafa';
+                iterationDiv.style.padding = '1em';
+                iterationDiv.style.borderRadius = '4px';
+                iterationDiv.innerHTML = `
+                    <h4 style="color: #1976d2;">🔄 Iteration ${index + 1}</h4>
+                    <div style="margin-bottom: 1em;">
+                        <strong>📝 Current Prompt:</strong>
+                        <div style="background: #f5f5f5; padding: 0.5em; margin-top: 0.5em; border-radius: 4px; font-family: monospace; white-space: pre-wrap;">${escapeHtml(item.prompt)}</div>
+                    </div>
+                    <div style="margin-bottom: 1em;">
+                        <strong>🎯 Review Criteria:</strong>
+                        <div style="background: #fff3e0; padding: 0.5em; margin-top: 0.5em; border-radius: 4px;">${escapeHtml(item.review_prompt)}</div>
+                    </div>
+                    <div style="margin-bottom: 1em;">
+                        <strong>📋 Analysis & Critique:</strong>
+                        <div style="background: ${item.critique.includes('SATISFIED') ? '#e8f5e8' : '#fff8e1'}; padding: 0.5em; margin-top: 0.5em; border-radius: 4px;">${escapeHtml(item.critique)}</div>
+                    </div>
+                `;
+                historyDiv.appendChild(iterationDiv);
+            });
+            
+            document.getElementById('results').style.display = 'block';
+            const suffix = data.satisfied ? 'prompt satisfied ✨' : 'stopped at max iterations ⏹️';
+            const statusEl = document.getElementById('status');
+            statusEl.style.color = '#1b5e20';
+            statusEl.innerHTML = `✅ <strong>Complete!</strong> ${data.iterations} iteration(s), ${suffix}<br>
+                📊 Model: ${data.model} | 🌡️ Temp: ${data.temperature} | 🔢 Max tokens: ${data.max_tokens}<br>
+                ${data.saved_file ? `💾 Saved as: ${data.saved_file}` : ''}`;
+            addLogEntry(`🏁 Refinement complete: ${data.iterations} iterations, ${suffix}`, '🎯');
+            if (data.saved_file) {
+                addLogEntry(`💾 Saved to file: ${data.saved_file}`, '💾');
+            }
+            
+            // Scroll to results
+            document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        document.getElementById('refine-form').addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const prompt = document.getElementById('prompt').value;
+            const attachments = document.getElementById('attachments').value;
+            const model = document.getElementById('model').value;
+            const temperature = document.getElementById('temperature').value;
+            const max_tokens = document.getElementById('max_tokens').value;
+            const max_iterations = document.getElementById('max_iterations').value;
+            const review_prompt = document.getElementById('review_prompt').value;
+
+            const statusEl = document.getElementById('status');
+            statusEl.style.color = '#333';
+            statusEl.innerHTML = '⏳ Starting refinement process...';
+            
+            const progressLog = document.getElementById('progress-log');
+            const logContent = document.getElementById('log-content');
+            progressLog.style.display = 'block';
+            logContent.innerHTML = '';
+            
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const oldBtnText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Refining…';
+
+            // Always use WebSocket streaming for real-time updates
+            addLogEntry(`🚀 Starting real-time refinement with ${model}`, '🚀');
+            const socket = initializeSocket();
+            
+            socket.emit('start_refinement', {
+                prompt,
+                attachments,
+                model,
+                temperature,
+                max_tokens,
+                max_iterations,
+                review_prompt
+            });
+        });
+    </script>
+</body>
+</html>                response = await fetch('/refine', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        prompt, 
+                        attachments,
+                        model,
+                        temperature,
+                        max_tokens,
+                        max_iterations,
+                        review_prompt
+                    })
+                });
+
+                addLogEntry('Server response received, processing...', '📨');
+                const data = await response.json();
+
+                if (response.ok) {
+                    addLogEntry(`✅ Processing complete! Generated ${data.iterations} iteration(s)`, '🎉');
+                    
+                    const escapeHtml = (unsafe) => {
+                        return unsafe
+                            .replaceAll('&', '&amp;')
+                            .replaceAll('<', '&lt;')
+                            .replaceAll('>', '&gt;');
+                    };
+                    
+                    // Show the refined prompt prominently
+                    const refinedPromptEl = document.getElementById('refined-prompt');
+                    refinedPromptEl.textContent = data.refined_prompt;
+                    
+                    // Show history
+                    const historyDiv = document.getElementById('history');
+                    historyDiv.innerHTML = '';
+
+                    // Show each iteration with a small delay for better UX
+                    for (let index = 0; index < data.history.length; index++) {
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                        addLogEntry(`📄 Displaying iteration ${index + 1} details...`, '�');
+                        
+                        const item = data.history[index];
+                        const iterationDiv = document.createElement('div');
+                        iterationDiv.style.borderBottom = '1px solid #eee';
+                        iterationDiv.style.paddingBottom = '1em';
+                        iterationDiv.style.marginBottom = '1em';
+                        iterationDiv.style.backgroundColor = '#fafafa';
+                        iterationDiv.style.padding = '1em';
+                        iterationDiv.style.borderRadius = '4px';
+                        iterationDiv.innerHTML = `
+                            <h4 style="color: #1976d2;">🔄 Iteration ${index + 1}</h4>
+                            <div style="margin-bottom: 1em;">
+                                <strong>📝 Current Prompt:</strong>
+                                <div style="background: #f5f5f5; padding: 0.5em; margin-top: 0.5em; border-radius: 4px; font-family: monospace; white-space: pre-wrap;">${escapeHtml(item.prompt)}</div>
+                            </div>
+                            <div style="margin-bottom: 1em;">
+                                <strong>🎯 Review Criteria:</strong>
+                                <div style="background: #fff3e0; padding: 0.5em; margin-top: 0.5em; border-radius: 4px;">${escapeHtml(item.review_prompt)}</div>
+                            </div>
+                            <div style="margin-bottom: 1em;">
+                                <strong>📋 Analysis & Critique:</strong>
+                                <div style="background: ${item.critique.includes('SATISFIED') ? '#e8f5e8' : '#fff8e1'}; padding: 0.5em; margin-top: 0.5em; border-radius: 4px;">${escapeHtml(item.critique)}</div>
+                            </div>
+                        `;
+                        historyDiv.appendChild(iterationDiv);
+                    }
+                    
+                    document.getElementById('results').style.display = 'block';
+                    const suffix = data.satisfied ? 'prompt satisfied ✨' : 'stopped at max iterations ⏹️';
+                    statusEl.style.color = '#1b5e20';
+                    statusEl.innerHTML = `✅ <strong>Complete!</strong> ${data.iterations} iteration(s), ${suffix}<br>
+                        📊 Model: ${data.model} | 🌡️ Temp: ${data.temperature} | 🔢 Max tokens: ${data.max_tokens}`;
+                    addLogEntry(`� Refinement complete: ${data.iterations} iterations, ${suffix}`, '�');
+                    
+                    // Scroll to results
+                    document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+                } else {
+                    statusEl.style.color = '#b00020';
+                    statusEl.textContent = 'Error: ' + (data.error || 'Unknown error');
+                    addLogEntry('❌ ' + (data.error || 'Unknown error'), '❌');
+                }
+            } catch (e) {
+                statusEl.style.color = '#b00020';
+                statusEl.textContent = 'Network error. Please try again.';
+                addLogEntry('Network error: ' + e.message, '❌');
+            }
+
+            submitBtn.disabled = false;
+            submitBtn.textContent = oldBtnText;
+        });
+    </script>
+</body>
+</html>
