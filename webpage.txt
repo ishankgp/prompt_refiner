@@ -1,0 +1,234 @@
+
+# For Healthcare Professionals
+
+Boehringer Ingelheim Logo  
+HCP  
+
+- Products Opens in new tab  
+- Therapeutic Areas Opens in new tab  
+- Resources and Services Opens in new tab  
+
+**Prescribing Information**  
+Opens in new tab  
+**Medication Guide**  
+Opens in new tab  
+**For Patients**  
+Opens in new tab  
+**Contact a Sales Consultant**  
+
+- Study Design  
+- Efficacy  
+- Safety  
+
+---
+
+# Spevigo (spesolimab-sbzo) injection  
+## 48 week trial data 1-3
+
+# Time to First GPP Flare (up to 48 weeks)
+
+## Kaplan–Meier Analysis Table
+
+| Time (weeks) | Estimated Probability (SPEVIGO SC) | Estimated Probability (Placebo) | Number at Risk (SPEVIGO SC) | Number at Risk (Placebo) |
+|--------------|------------------------------------|---------------------------------|------------------------------|---------------------------|
+| 0            | 1.00                               | 1.00                            | 30                           | 31                        |
+| 4            | 0.93                               | 0.83                            | 26                           | 23                        |
+| 8            | 0.93                               | 0.74                            | 26                           | 20                        |
+| 12           | 0.93                               | 0.68                            | 26                           | 20                        |
+| 16           | 0.93                               | 0.62                            | 26                           | 19                        |
+| 20           | 0.93                               | 0.60                            | 26                           | 17                        |
+| 24           | 0.93                               | 0.58                            | 25                           | 17                        |
+| 28           | 0.93                               | 0.58                            | 24                           | 17                        |
+| 32           | 0.93                               | 0.58                            | 23                           | 17                        |
+| 36           | 0.93                               | 0.56                            | 22                           | 16                        |
+| 40           | 0.93                               | 0.55                            | 22                           | 15                        |
+| 44           | 0.93                               | 0.55                            | 22                           | 15                        |
+| 48           | 0.93                               | 0.55                            | 18                           | 11                        |
+
+---
+
+## Key Statistical Result
+- **Hazard Ratio (HR):** 0.16  
+- **95% CI:** 0.05–0.54  
+- **p-value:** 0.0005  
+
+---
+
+## Notes
+- **SPEVIGO SC:** 600 mg loading dose, followed by 300 mg every 4 weeks.  
+- **Definition of flare:** Increase of ≥2 in GPPPGA total score from baseline **and** GPPPGA pustulation subscore ≥2.  
+
+
+SPEVIGO SC (subcutaneous) reduced the risk of GPP flares over 48 weeks vs placebo1,2  
+Results from Effisayil® 2 Clinical Trial  
+
+
+GPP flare is defined as an increase of ≥2 in GPPPGA total score from baseline and a GPPPGA pustulation subscore ≥2.4  
+
+*SPEVIGO SC was administered with a 600 mg subcutaneous loading dose followed by 300 mg subcutaneously every 4 weeks.4*  
+
+CI=confidence interval; GPP=generalized pustular psoriasis; SC=subcutaneous.  
+
+---
+
+## Key secondary endpoint
+
+# Occurrence of at least one GPP flare, up to Week 48¹
+
+---
+
+## Risk Difference
+
+**Risk difference vs placebo: -0.39**  
+(95% CI: -0.62, -0.16);  
+1-sided *P* = 0.0013  
+
+---
+
+## Results
+
+| Group          | n    | % of patients with ≥1 GPP flare by Week 48 |
+|----------------|------|--------------------------------------------|
+| SPEVIGO SC†    | 30   | **12.7%** (n=3)                            |
+| Placebo        | 31   | **51.6%** (n=16)                           |
+
+---
+
+## Interpretation
+
+Using a 1-sided α of 0.0063 (adjusted for multiplicity), high-dose SPEVIGO SC† showed statistically significant improvement over placebo¹.  
+
+The secondary endpoint for SPEVIGO SC† treatment was occurrence of ≥1 GPP flare by Week 48¹.  
+
+---
+
+## Definition of Flare
+
+GPP flare is defined as an increase of ≥2 in GPPPGA total score from baseline and a GPPPGA pustulation subscore ≥2.⁴  
+
+---
+
+## Notes
+
+* Missing data were imputed by a sequential regression multiple imputation method for patients with no flare by Week 48.¹  
+
+† SPEVIGO SC was administered with a 600 mg subcutaneous loading dose followed by 300 mg subcutaneously every 4 weeks.⁴  
+
+
+On this page  
+- Primary endpoint  
+- Key secondary endpoint  
+- Quicklinks  
+- View study design  
+- GPPPGA score  
+- References  
+
+Morita A, Strober B, Burden AD, et al. Efficacy and safety of subcutaneous spesolimab for the prevention of generalised pustular psoriasis flares (Effisayil 2): an international, multicentre, randomised, placebo-controlled trial.  
+Lancet. 2023;402(10412):1541-1551. doi:10.1016/S0140-6736(23)01378-8  
+
+Data on File. Clinical Trial Report. 2021. Boehringer Ingelheim Pharmaceuticals, Inc.  
+
+Gordon KB, Lebwohl MG, Barker J, et al. Effect of spesolimab on achieving sustained disease remission in patients with generalized pustular psoriasis: results from the Effisayil 2 study. Poster presented at: Winter Clinical Dermatology Conference - Hawaii 24; January 12-17, 2024; Lahaina, HI.  
+
+SPEVIGO® [package insert]. Ridgefield, CT: Boehringer Ingelheim Pharmaceuticals, Inc; March 2024.  
+
+View More  
+
+---
+
+# INDICATION
+
+SPEVIGO is indicated for the treatment of generalized pustular psoriasis (GPP) in adults and pediatric patients 12 years of age and older and weighing at least 40 kg.  
+
+---
+
+# IMPORTANT SAFETY INFORMATION
+
+## CONTRAINDICATIONS
+
+SPEVIGO is contraindicated in patients with severe or life-threatening hypersensitivity to spesolimab-sbzo or to any of the excipients in SPEVIGO. Reported hypersensitivity reactions have included drug reaction with eosinophilia and systemic symptoms (DRESS).  
+
+---
+
+## WARNINGS AND PRECAUTIONS
+
+### Infections
+SPEVIGO may increase the risk of infections. In patients with a chronic infection or a history of recurrent infection, consider the potential risks and expected clinical benefits of treatment prior to prescribing SPEVIGO. Treatment with SPEVIGO is not recommended in patients with any clinically important active infection until the infection resolves or is adequately treated. Instruct patients to seek medical advice if signs or symptoms of clinically important infection occur during or after treatment with SPEVIGO. If a patient develops a clinically important active infection, discontinue SPEVIGO therapy until the infection resolves or is adequately treated.  
+
+### Risk of Tuberculosis
+Evaluate patients for tuberculosis (TB) infection prior to initiating treatment with SPEVIGO. Avoid use of SPEVIGO in patients with active TB infection. Consider initiating anti-TB therapy prior to initiating SPEVIGO in patients with latent TB or a history of TB in whom an adequate course of treatment cannot be confirmed. Monitor patients for signs and symptoms of active TB during and after SPEVIGO treatment.  
+
+### Hypersensitivity and Infusion-Related Reactions
+SPEVIGO-associated hypersensitivity reactions may include immediate reactions, such as anaphylaxis, and delayed reactions, such as drug reaction with eosinophilia and systemic symptoms (DRESS).  
+Drug reaction with eosinophilia and systemic symptoms (DRESS) has been reported in clinical trials with spesolimab-sbzo in subjects with GPP.  
+If a patient develops signs of anaphylaxis or other serious hypersensitivity, discontinue SPEVIGO immediately and initiate appropriate treatment.  
+If a patient develops mild or moderate hypersensitivity during an intravenous infusion or other infusion-related reactions, stop SPEVIGO infusion and consider appropriate medical therapy (eg, systemic antihistamines and/or corticosteroids). Upon resolution of the reaction, the infusion may be restarted at a slower infusion rate with gradual increase to complete the infusion.  
+
+### Vaccinations
+Prior to initiating SPEVIGO for treatment of GPP, complete all age-appropriate vaccinations according to current immunization guidelines. Avoid use of live vaccines in patients during and for at least 16 weeks after treatment with SPEVIGO. No specific studies have been conducted in SPEVIGO-treated patients who have recently received live viral or live bacterial vaccines.  
+
+---
+
+## ADVERSE REACTIONS
+
+### Intravenous SPEVIGO for Treatment of GPP Flare (Study Effisayil-1)
+Most common adverse reactions reported in ≥5% of patients treated with SPEVIGO in the clinical trial were asthenia and fatigue, nausea and vomiting, headache, pruritus and prurigo, infusion site hematoma and bruising, and urinary tract infection (UTI).  
+
+**Specific Adverse Reactions**  
+
+**Infections:** The most frequent adverse reactions that occurred in subjects treated with intravenous SPEVIGO were infections. During the 1-week placebo-controlled period in Study Effisayil-1, infections were reported in 14% of subjects treated with SPEVIGO compared with 6% of subjects treated with placebo. Serious infection (UTI) was reported in 1 subject (3%) in the SPEVIGO group and no subjects in the placebo group. Infections observed through Week 1 in Study Effisayil-1 in subjects treated with SPEVIGO were mild (29%) to moderate (71%).  
+
+**Drug Reaction With Eosinophilia and Systemic Symptoms (DRESS):** Two cases of DRESS were reported in Study Effisayil-1 in subjects with GPP who were treated with intravenous SPEVIGO. RegiSCAR DRESS validation scoring (with the following categories: “no,” “possible,” “probable,” or “definite” DRESS) was applied to the reported cases. Reported cases were assessed as “no DRESS” and “possible DRESS.”  
+
+---
+
+### Subcutaneous SPEVIGO for Treatment of GPP When Not Experiencing a Flare (Study Effisayil-2)
+Regarding the exposure-adjusted incidence rates for subjects on randomized treatment prior to receiving rescue treatment for flare or completing trial without a flare, the rate per 100-patient years for injection site reaction (including erythema, pain, swelling, induration, urticaria, and warmth at the injection site) was 31.6 for the subcutaneous SPEVIGO cohort (600 mg loading dose followed by 300 mg every 4 weeks) vs 12.7 for the placebo cohort. The rate per 100-patient years for UTI was 18 for SPEVIGO vs 0 for placebo. The rate per 100-patient years for pruritus was 8.8 for SPEVIGO vs 0 for placebo. The rate per 100-patient years for arthralgia was 13.3 for SPEVIGO vs 6 for the placebo cohort. There were 3 subjects who discontinued subcutaneous SPEVIGO due to treatment-emergent adverse events of psoriasis compared to no subjects in the placebo cohort who discontinued placebo for any treatment-emergent adverse event.  
+
+---
+
+### Safety in Study Effisayil-2 After Flare
+In Effisayil-2, subjects who experienced a GPP flare and received at least one dose of an open-label single intravenous 900 mg dose of SPEVIGO were treated with open-label subcutaneous SPEVIGO 300 mg. These subjects (n=19) received subcutaneous dosing at every 12 weeks, which could have been increased to every 4 weeks based on GPPPGA total score or pustulation subscore increased by ≥1 from any previous open-label maintenance visit. The reported safety profile of open-label subcutaneous SPEVIGO use after treatment of GPP flare with open-label intravenous SPEVIGO use was consistent with the safety profiles of use of SPEVIGO from Trial Effisayil-1 and randomized controlled data from Trial Effisayil-2.  
+
+---
+
+## Clinical Development of Spesolimab-sbzo
+
+**Guillain-Barre Syndrome (GBS):** Among approximately 835 subjects exposed to spesolimab-sbzo during clinical development, GBS was reported in 3 subjects who received various doses of spesolimab-sbzo via various methods of administration in clinical trials for unapproved indications.  
+
+---
+
+## SPECIFIC POPULATIONS
+
+### Pediatric Use
+The safety and effectiveness of SPEVIGO for the treatment of GPP have been established in pediatric patients 12 years of age and older and weighing at least 40 kg. Use of SPEVIGO for this indication is supported by data from a randomized, placebo-controlled study, which included 6 pediatric subjects 14 to 17 years of age with a history of GPP treated with subcutaneous SPEVIGO (Study Effisayil-2), and evidence from an adequate and well-controlled study of intravenous SPEVIGO in adults with GPP (Study Effisayil-1), with additional pharmacokinetic analyses showing similar drug exposure levels in adults and pediatric subjects 12 years of age and older and weighing 40 kg or more. The safety and effectiveness of SPEVIGO in pediatric patients younger than 12 years of age or in pediatric patients weighing less than 40 kg have not been established.  
+
+CL-SPG-100005 03.19.2024  
+
+Please see SPEVIGO Prescribing Information, including Medication Guide.  
+
+---
+
+# Boehringer Ingelheim Logo
+
+BI Logo  
+
+- Accessibility Statement Opens in new tab  
+- Terms of Use Opens in new tab  
+- Imprint Opens in new tab  
+- US Privacy Statement Opens in new tab  
+- Consumer Health Data Privacy Statement Opens in new tab  
+- Cookie Statement Opens in new tab  
+- Do Not Sell or Share My Personal Data Opens in new tab  
+- Limit the Use of My Sensitive Data Opens in new tab  
+- Contact Us Opens in new tab  
+
+This information is for U.S. residents only. Products discussed herein may have different labeling in different countries.  
+Use of this site is subject to the Internet Site Legal Notices and Disclaimers and Privacy Notice.  
+Boehringer Ingelheim Pharmaceuticals, Inc. either owns or uses the trademark SPEVIGO® under license.  
+
+---
+
+© 2024 Boehringer Ingelheim Pharmaceuticals, Inc. All rights reserved. (09/24) PC-US-140210
+
+

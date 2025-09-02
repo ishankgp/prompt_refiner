@@ -14,13 +14,46 @@
             height: 150px;
             margin-bottom: 1em;
         }
-    .result {
+        .result {
             margin-top: 2em;
             border: 1px solid #ccc;
             padding: 1em;
         }
         .result h3 {
             margin-top: 0;
+        }
+        .tab-button {
+            background: none;
+            border: none;
+            padding: 0.8em 1.5em;
+            cursor: pointer;
+            font-weight: bold;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+        .tab-button:hover {
+            background-color: #f5f5f5;
+        }
+        .tab-button.active {
+            border-bottom-color: #1976d2 !important;
+        }
+        .tab-content {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1em;
+            margin-bottom: 1em;
+        }
+        @media (max-width: 768px) {
+            .comparison-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -29,8 +62,9 @@
     <form id="refine-form">
         <label for="prompt">Initial Prompt:</label><br>
         <textarea id="prompt" name="prompt" required></textarea><br>
-        <label for="attachments">Attachments (optional):</label><br>
-        <textarea id="attachments" name="attachments"></textarea><br>
+        <label for="attachments">Attachments (webpage.txt loaded as default):</label><br>
+        <small style="color: #666; margin-bottom: 0.5em; display: block;">📎 Default attachment from webpage.txt is automatically loaded. You can modify or replace this content.</small>
+        <textarea id="attachments" name="attachments">{{ default_attachment }}</textarea><br>
 
         <h3>Parameters</h3>
         <label for="model">Model:</label>
@@ -66,13 +100,45 @@
     </div>
 
     <div id="results" class="result" style="display:none;">
-        <h3 style="color: #1b5e20;">🎯 Final Refined Prompt:</h3>
-        <div id="refined-prompt" style="background: #f0f8ff; padding: 1em; border-radius: 4px; border-left: 4px solid #1976d2; margin-bottom: 1em; font-family: monospace; white-space: pre-wrap;"></div>
+        <h3 style="color: #1b5e20;">🎯 Refinement Results</h3>
         
-        <details style="margin-top: 2em;">
-            <summary style="cursor: pointer; font-weight: bold; color: #333;">📊 View Refinement History</summary>
+        <!-- Tab Navigation -->
+        <div style="border-bottom: 2px solid #e0e0e0; margin-bottom: 1em;">
+            <button class="tab-button active" onclick="showTab('final-tab', this)" style="background: none; border: none; padding: 0.8em 1.5em; cursor: pointer; font-weight: bold; border-bottom: 3px solid #1976d2;">📄 Final Result</button>
+            <button class="tab-button" onclick="showTab('comparison-tab', this)" style="background: none; border: none; padding: 0.8em 1.5em; cursor: pointer; font-weight: bold; border-bottom: 3px solid transparent;">🔍 What Changed</button>
+            <button class="tab-button" onclick="showTab('history-tab', this)" style="background: none; border: none; padding: 0.8em 1.5em; cursor: pointer; font-weight: bold; border-bottom: 3px solid transparent;">📊 Full History</button>
+        </div>
+        
+        <!-- Final Result Tab -->
+        <div id="final-tab" class="tab-content">
+            <h4 style="color: #1b5e20;">🎯 Final Refined Prompt:</h4>
+            <div id="refined-prompt" style="background: #f0f8ff; padding: 1em; border-radius: 4px; border-left: 4px solid #1976d2; margin-bottom: 1em; font-family: monospace; white-space: pre-wrap;"></div>
+        </div>
+        
+        <!-- Comparison Tab -->
+        <div id="comparison-tab" class="tab-content" style="display: none;">
+            <h4 style="color: #1b5e20;">🔍 Original vs Refined Comparison:</h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1em; margin-bottom: 1em;">
+                <div>
+                    <h5 style="color: #d32f2f; margin-bottom: 0.5em;">❌ Original Prompt:</h5>
+                    <div id="original-prompt" style="background: #fff3e0; padding: 1em; border-radius: 4px; border-left: 4px solid #ff9800; font-family: monospace; white-space: pre-wrap; max-height: 400px; overflow-y: auto;"></div>
+                </div>
+                <div>
+                    <h5 style="color: #1b5e20; margin-bottom: 0.5em;">✅ Refined Prompt:</h5>
+                    <div id="refined-prompt-comparison" style="background: #f0f8ff; padding: 1em; border-radius: 4px; border-left: 4px solid #1976d2; font-family: monospace; white-space: pre-wrap; max-height: 400px; overflow-y: auto;"></div>
+                </div>
+            </div>
+            <div id="diff-summary" style="background: #f5f5f5; padding: 1em; border-radius: 4px; margin-top: 1em;">
+                <h5 style="margin-top: 0;">📈 Summary of Changes:</h5>
+                <div id="change-stats"></div>
+            </div>
+        </div>
+        
+        <!-- History Tab -->
+        <div id="history-tab" class="tab-content" style="display: none;">
+            <h4 style="color: #1b5e20;">📊 Detailed Refinement History:</h4>
             <div id="history" style="margin-top: 1em;"></div>
-        </details>
+        </div>
     </div>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
@@ -126,6 +192,83 @@
             logContent.scrollTop = logContent.scrollHeight;
         }
         
+        function showTab(tabId, buttonElement) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.style.display = 'none';
+            });
+            
+            // Remove active class from all buttons
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.style.borderBottomColor = 'transparent';
+                button.classList.remove('active');
+            });
+            
+            // Show selected tab and mark button as active
+            document.getElementById(tabId).style.display = 'block';
+            buttonElement.style.borderBottomColor = '#1976d2';
+            buttonElement.classList.add('active');
+        }
+        
+        function calculateDifference(original, refined) {
+            const originalWords = original.split(/\s+/).length;
+            const refinedWords = refined.split(/\s+/).length;
+            const wordDiff = refinedWords - originalWords;
+            
+            const originalLines = original.split('\n').length;
+            const refinedLines = refined.split('\n').length;
+            const lineDiff = refinedLines - originalLines;
+            
+            // Simple character-based changes estimate
+            const originalChars = original.length;
+            const refinedChars = refined.length;
+            const charDiff = refinedChars - originalChars;
+            
+            return {
+                wordDiff,
+                lineDiff,
+                charDiff,
+                wordChange: ((wordDiff / originalWords) * 100).toFixed(1),
+                sizeChange: ((charDiff / originalChars) * 100).toFixed(1)
+            };
+        }
+        
+        function highlightKeyChanges(original, refined) {
+            // Simple highlighting of major structural changes
+            const changes = [];
+            
+            // Check for new sections/headers
+            const originalHeaders = original.match(/\*\*[^*]+\*\*/g) || [];
+            const refinedHeaders = refined.match(/\*\*[^*]+\*\*/g) || [];
+            
+            const newHeaders = refinedHeaders.filter(h => !originalHeaders.includes(h));
+            if (newHeaders.length > 0) {
+                changes.push(`Added ${newHeaders.length} new section(s): ${newHeaders.slice(0, 2).map(h => h.replace(/\*\*/g, '')).join(', ')}${newHeaders.length > 2 ? '...' : ''}`);
+            }
+            
+            // Check for structural improvements
+            if (refined.includes('### ') && !original.includes('### ')) {
+                changes.push('Improved structure with clearer section headings');
+            }
+            
+            if (refined.length > original.length * 1.2) {
+                changes.push('Significantly expanded with more detailed instructions');
+            } else if (refined.length < original.length * 0.8) {
+                changes.push('Streamlined and made more concise');
+            }
+            
+            // Check for specific improvements
+            if (refined.includes('Clinical Implications') && !original.includes('Clinical Implications')) {
+                changes.push('Added clinical implications section');
+            }
+            
+            if (refined.includes('Safety Information') && !original.includes('Safety Information')) {
+                changes.push('Enhanced safety information guidelines');
+            }
+            
+            return changes.length > 0 ? changes : ['General improvements to clarity and structure'];
+        }
+        
         function handleComplete(data) {
             addLogEntry(`✅ Processing complete! Generated ${data.iterations} iteration(s)`, '🎉');
             
@@ -136,11 +279,50 @@
                     .replaceAll('>', '&gt;');
             };
             
-            // Show the refined prompt prominently
+            // Get the original prompt from the first iteration or form
+            const originalPrompt = data.history && data.history.length > 0 
+                ? data.history[0].prompt 
+                : document.getElementById('prompt').value;
+            
+            // Populate Final Result Tab
             const refinedPromptEl = document.getElementById('refined-prompt');
             refinedPromptEl.textContent = data.refined_prompt;
             
-            // Show history
+            // Populate Comparison Tab
+            const originalPromptEl = document.getElementById('original-prompt');
+            const refinedPromptComparisonEl = document.getElementById('refined-prompt-comparison');
+            originalPromptEl.textContent = originalPrompt;
+            refinedPromptComparisonEl.textContent = data.refined_prompt;
+            
+            // Calculate and display differences
+            const diff = calculateDifference(originalPrompt, data.refined_prompt);
+            const keyChanges = highlightKeyChanges(originalPrompt, data.refined_prompt);
+            
+            const changeStatsEl = document.getElementById('change-stats');
+            changeStatsEl.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1em; margin-bottom: 1em;">
+                    <div style="background: #e3f2fd; padding: 0.8em; border-radius: 4px;">
+                        <strong>📏 Length Change:</strong><br>
+                        ${diff.charDiff > 0 ? '+' : ''}${diff.charDiff} characters (${diff.sizeChange > 0 ? '+' : ''}${diff.sizeChange}%)
+                    </div>
+                    <div style="background: #f3e5f5; padding: 0.8em; border-radius: 4px;">
+                        <strong>📝 Word Count:</strong><br>
+                        ${diff.wordDiff > 0 ? '+' : ''}${diff.wordDiff} words (${diff.wordChange > 0 ? '+' : ''}${diff.wordChange}%)
+                    </div>
+                    <div style="background: #e8f5e8; padding: 0.8em; border-radius: 4px;">
+                        <strong>📋 Structure:</strong><br>
+                        ${diff.lineDiff > 0 ? '+' : ''}${diff.lineDiff} lines
+                    </div>
+                </div>
+                <div style="background: #fff3e0; padding: 1em; border-radius: 4px;">
+                    <strong>🎯 Key Improvements:</strong>
+                    <ul style="margin: 0.5em 0;">
+                        ${keyChanges.map(change => `<li>${change}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+            
+            // Populate History Tab
             const historyDiv = document.getElementById('history');
             historyDiv.innerHTML = '';
 
@@ -157,20 +339,21 @@
                     <h4 style="color: #1976d2;">🔄 Iteration ${index + 1}</h4>
                     <div style="margin-bottom: 1em;">
                         <strong>📝 Current Prompt:</strong>
-                        <div style="background: #f5f5f5; padding: 0.5em; margin-top: 0.5em; border-radius: 4px; font-family: monospace; white-space: pre-wrap;">${escapeHtml(item.prompt)}</div>
+                        <div style="background: #f5f5f5; padding: 0.5em; margin-top: 0.5em; border-radius: 4px; font-family: monospace; white-space: pre-wrap; max-height: 200px; overflow-y: auto;">${escapeHtml(item.prompt)}</div>
                     </div>
                     <div style="margin-bottom: 1em;">
                         <strong>🎯 Review Criteria:</strong>
-                        <div style="background: #fff3e0; padding: 0.5em; margin-top: 0.5em; border-radius: 4px;">${escapeHtml(item.review_prompt)}</div>
+                        <div style="background: #fff3e0; padding: 0.5em; margin-top: 0.5em; border-radius: 4px; max-height: 150px; overflow-y: auto;">${escapeHtml(item.review_prompt)}</div>
                     </div>
                     <div style="margin-bottom: 1em;">
                         <strong>📋 Analysis & Critique:</strong>
-                        <div style="background: ${item.critique.includes('SATISFIED') ? '#e8f5e8' : '#fff8e1'}; padding: 0.5em; margin-top: 0.5em; border-radius: 4px;">${escapeHtml(item.critique)}</div>
+                        <div style="background: ${item.critique.includes('SATISFIED') ? '#e8f5e8' : '#fff8e1'}; padding: 0.5em; margin-top: 0.5em; border-radius: 4px; max-height: 150px; overflow-y: auto;">${escapeHtml(item.critique)}</div>
                     </div>
                 `;
                 historyDiv.appendChild(iterationDiv);
             });
             
+            // Show results and update status
             document.getElementById('results').style.display = 'block';
             const suffix = data.satisfied ? 'prompt satisfied ✨' : 'stopped at max iterations ⏹️';
             const statusEl = document.getElementById('status');

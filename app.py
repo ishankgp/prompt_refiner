@@ -10,6 +10,20 @@ from datetime import datetime
 
 load_dotenv()
 
+def load_default_attachment():
+    """Load the default attachment from webpage.txt"""
+    try:
+        with open('webpage.txt', 'r', encoding='utf-8') as f:
+            content = f.read()
+        logger.info("Default attachment (webpage.txt) loaded successfully")
+        return content
+    except FileNotFoundError:
+        logger.warning("webpage.txt not found, no default attachment loaded")
+        return ""
+    except Exception as e:
+        logger.error(f"Error loading webpage.txt: {e}")
+        return ""
+
 # Setup logging
 def setup_logging():
     """Setup comprehensive logging for analysis"""
@@ -79,7 +93,8 @@ def save_refined_prompt(original_prompt, refined_prompt, history, metadata, logs
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    default_attachment = load_default_attachment()
+    return render_template('index.html', default_attachment=default_attachment)
 
 @socketio.on('connect')
 def handle_connect():
